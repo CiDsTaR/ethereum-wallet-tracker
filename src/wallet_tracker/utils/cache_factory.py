@@ -1,14 +1,12 @@
 """Cache factory for creating appropriate cache instances."""
 
 import logging
-from pathlib import Path
-from typing import Optional
 
-from ..config import CacheConfig, CacheBackend
+from ..config import CacheBackend, CacheConfig
 from .cache_interface import CacheInterface
-from .redis_cache import RedisCache
 from .file_cache import FileCache
 from .hybrid_cache import HybridCache
+from .redis_cache import RedisCache
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +89,9 @@ class CacheManager:
             config: Cache configuration
         """
         self.config = config
-        self._price_cache: Optional[CacheInterface] = None
-        self._balance_cache: Optional[CacheInterface] = None
-        self._general_cache: Optional[CacheInterface] = None
+        self._price_cache: CacheInterface | None = None
+        self._balance_cache: CacheInterface | None = None
+        self._general_cache: CacheInterface | None = None
 
     def get_price_cache(self) -> CacheInterface:
         """Get cache for token prices with appropriate TTL."""
@@ -122,7 +120,7 @@ class CacheManager:
         key = f"price:{token_id}"
         return await cache.set(key, price_data, ttl=self.config.ttl_prices)
 
-    async def get_price(self, token_id: str) -> Optional[dict]:
+    async def get_price(self, token_id: str) -> dict | None:
         """Get token price from cache."""
         cache = self.get_price_cache()
         key = f"price:{token_id}"
@@ -134,7 +132,7 @@ class CacheManager:
         key = f"balance:{wallet_address.lower()}"
         return await cache.set(key, balance_data, ttl=self.config.ttl_balances)
 
-    async def get_balance(self, wallet_address: str) -> Optional[dict]:
+    async def get_balance(self, wallet_address: str) -> dict | None:
         """Get wallet balance from cache."""
         cache = self.get_balance_cache()
         key = f"balance:{wallet_address.lower()}"
@@ -148,7 +146,7 @@ class CacheManager:
         ttl = self.config.ttl_prices * 24  # 24x longer than prices
         return await cache.set(key, activity_data, ttl=ttl)
 
-    async def get_wallet_activity(self, wallet_address: str) -> Optional[dict]:
+    async def get_wallet_activity(self, wallet_address: str) -> dict | None:
         """Get wallet activity from cache."""
         cache = self.get_general_cache()
         key = f"activity:{wallet_address.lower()}"
@@ -162,7 +160,7 @@ class CacheManager:
         ttl = self.config.ttl_prices * 168  # 1 week
         return await cache.set(key, metadata, ttl=ttl)
 
-    async def get_token_metadata(self, token_address: str) -> Optional[dict]:
+    async def get_token_metadata(self, token_address: str) -> dict | None:
         """Get token metadata from cache."""
         cache = self.get_general_cache()
         key = f"token_meta:{token_address.lower()}"

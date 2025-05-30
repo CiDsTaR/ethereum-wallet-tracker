@@ -1,11 +1,9 @@
 """Ethereum client for blockchain interactions using Alchemy APIs."""
 
 import logging
-import asyncio
-from typing import Optional, List, Dict, Any
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timedelta, timezone
-import json
+from typing import Any
 
 import aiohttp
 from asyncio_throttle import Throttler
@@ -13,19 +11,16 @@ from asyncio_throttle import Throttler
 from ..config import EthereumConfig
 from ..utils import CacheManager
 from .ethereum_types import (
-    TokenBalance,
-    EthBalance,
-    WalletPortfolio,
-    TokenMetadata,
-    TransactionInfo,
-    WalletActivity,
-    AlchemyPortfolioResponse,
     WELL_KNOWN_TOKENS,
-    normalize_address,
-    is_valid_ethereum_address,
-    wei_to_eth,
-    format_token_amount,
+    EthBalance,
+    TokenBalance,
+    WalletActivity,
+    WalletPortfolio,
     calculate_token_value,
+    format_token_amount,
+    is_valid_ethereum_address,
+    normalize_address,
+    wei_to_eth,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,16 +28,19 @@ logger = logging.getLogger(__name__)
 
 class EthereumClientError(Exception):
     """Base exception for Ethereum client errors."""
+
     pass
 
 
 class InvalidAddressError(EthereumClientError):
     """Invalid Ethereum address error."""
+
     pass
 
 
 class APIError(EthereumClientError):
     """API request error."""
+
     pass
 
 
@@ -50,10 +48,10 @@ class EthereumClient:
     """Ethereum client using Alchemy Portfolio API and Web3."""
 
     def __init__(
-            self,
-            config: EthereumConfig,
-            cache_manager: Optional[CacheManager] = None,
-            session: Optional[aiohttp.ClientSession] = None,
+        self,
+        config: EthereumConfig,
+        cache_manager: CacheManager | None = None,
+        session: aiohttp.ClientSession | None = None,
     ):
         """Initialize Ethereum client.
 
@@ -103,18 +101,18 @@ class EthereumClient:
                 headers={
                     "Content-Type": "application/json",
                     "User-Agent": "EthereumWalletTracker/1.0",
-                }
+                },
             )
         return self._session
 
     async def _make_request(
-            self,
-            method: str,
-            url: str,
-            data: Optional[Dict[str, Any]] = None,
-            cache_key: Optional[str] = None,
-            cache_ttl: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        self,
+        method: str,
+        url: str,
+        data: dict[str, Any] | None = None,
+        cache_key: str | None = None,
+        cache_ttl: int | None = None,
+    ) -> dict[str, Any]:
         """Make HTTP request with rate limiting and caching.
 
         Args:
@@ -152,9 +150,7 @@ class EthereumClient:
 
                 # Cache successful response
                 if cache_key and self.cache_manager and cache_ttl:
-                    await self.cache_manager.get_general_cache().set(
-                        cache_key, response_data, ttl=cache_ttl
-                    )
+                    await self.cache_manager.get_general_cache().set(cache_key, response_data, ttl=cache_ttl)
 
                 return response_data
 
@@ -163,7 +159,7 @@ class EthereumClient:
                 logger.error(f"API request failed: {e}")
                 raise APIError(f"Request to {url} failed: {e}") from e
 
-    async def _handle_response(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
+    async def _handle_response(self, response: aiohttp.ClientResponse) -> dict[str, Any]:
         """Handle HTTP response and extract data."""
         if response.status == 200:
             data = await response.json()
@@ -184,10 +180,10 @@ class EthereumClient:
             raise APIError(f"HTTP {response.status}: {error_text}")
 
     async def get_wallet_portfolio(
-            self,
-            wallet_address: str,
-            include_metadata: bool = True,
-            include_prices: bool = True,
+        self,
+        wallet_address: str,
+        include_metadata: bool = True,
+        include_prices: bool = True,
     ) -> WalletPortfolio:
         """Get complete wallet portfolio using Alchemy Portfolio API.
 
@@ -224,9 +220,7 @@ class EthereumClient:
         eth_balance = await self._get_eth_balance(normalized_address)
 
         # Get token balances using Portfolio API
-        token_balances = await self._get_token_balances(
-            normalized_address, include_metadata, include_prices
-        )
+        token_balances = await self._get_token_balances(normalized_address, include_metadata, include_prices)
 
         # Get wallet activity
         activity = await self._get_wallet_activity(normalized_address)
@@ -243,7 +237,7 @@ class EthereumClient:
             eth_balance=eth_balance,
             token_balances=token_balances,
             total_value_usd=total_value_usd,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
             transaction_count=activity.transaction_count,
             last_transaction_hash=activity.last_transaction.hash if activity.last_transaction else None,
             last_transaction_timestamp=activity.last_transaction.timestamp if activity.last_transaction else None,
@@ -259,12 +253,7 @@ class EthereumClient:
 
     async def _get_eth_balance(self, wallet_address: str) -> EthBalance:
         """Get ETH balance for wallet."""
-        data = {
-            "id": 1,
-            "jsonrpc": "2.0",
-            "method": "eth_getBalance",
-            "params": [wallet_address, "latest"]
-        }
+        data = {"id": 1, "jsonrpc": "2.0", "method": "eth_getBalance", "params": [wallet_address, "latest"]}
 
         cache_key = f"eth_balance:{wallet_address}"
         response = await self._make_request(
@@ -272,7 +261,7 @@ class EthereumClient:
             self.eth_balance_url,
             data=data,
             cache_key=cache_key,
-            cache_ttl=300  # 5 minutes
+            cache_ttl=300,  # 5 minutes
         )
 
         balance_wei = response["result"]
@@ -290,18 +279,13 @@ class EthereumClient:
         )
 
     async def _get_token_balances(
-            self,
-            wallet_address: str,
-            include_metadata: bool,
-            include_prices: bool,
-    ) -> List[TokenBalance]:
+        self,
+        wallet_address: str,
+        include_metadata: bool,
+        include_prices: bool,
+    ) -> list[TokenBalance]:
         """Get token balances using Alchemy getTokenBalances API."""
-        data = {
-            "id": 1,
-            "jsonrpc": "2.0",
-            "method": "alchemy_getTokenBalances",
-            "params": [wallet_address]
-        }
+        data = {"id": 1, "jsonrpc": "2.0", "method": "alchemy_getTokenBalances", "params": [wallet_address]}
 
         cache_key = f"token_balances:{wallet_address}"
         response = await self._make_request(
@@ -309,7 +293,7 @@ class EthereumClient:
             self.portfolio_url,
             data=data,
             cache_key=cache_key,
-            cache_ttl=600  # 10 minutes
+            cache_ttl=600,  # 10 minutes
         )
 
         token_balances = []
@@ -366,7 +350,7 @@ class EthereumClient:
 
         return token_balances
 
-    async def _get_tokens_metadata(self, contract_addresses: List[str]) -> Dict[str, Dict[str, Any]]:
+    async def _get_tokens_metadata(self, contract_addresses: list[str]) -> dict[str, dict[str, Any]]:
         """Get metadata for multiple tokens."""
         if not contract_addresses:
             return {}
@@ -387,12 +371,7 @@ class EthereumClient:
 
         # Fetch uncached metadata
         if uncached_addresses:
-            data = {
-                "id": 1,
-                "jsonrpc": "2.0",
-                "method": "alchemy_getTokenMetadata",
-                "params": uncached_addresses
-            }
+            data = {"id": 1, "jsonrpc": "2.0", "method": "alchemy_getTokenMetadata", "params": uncached_addresses}
 
             try:
                 response = await self._make_request("POST", self.metadata_url, data=data)
@@ -419,13 +398,13 @@ class EthereumClient:
 
         return metadata_map
 
-    async def _get_tokens_prices(self, contract_addresses: List[str]) -> Dict[str, Decimal]:
+    async def _get_tokens_prices(self, contract_addresses: list[str]) -> dict[str, Decimal]:
         """Get prices for multiple tokens."""
         # This is a placeholder - in real implementation, you'd integrate with CoinGecko
         # For now, return empty dict
         return {}
 
-    async def _get_eth_price(self) -> Optional[Decimal]:
+    async def _get_eth_price(self) -> Decimal | None:
         """Get current ETH price in USD."""
         # This is a placeholder - integrate with CoinGecko client
         return Decimal("2000.0")  # Dummy price
@@ -456,7 +435,7 @@ class EthereumClient:
 
         return activity
 
-    def _serialize_portfolio(self, portfolio: WalletPortfolio) -> Dict[str, Any]:
+    def _serialize_portfolio(self, portfolio: WalletPortfolio) -> dict[str, Any]:
         """Serialize portfolio for caching."""
         return {
             "address": portfolio.address,
@@ -486,7 +465,7 @@ class EthereumClient:
             "transaction_count": portfolio.transaction_count,
         }
 
-    def _deserialize_portfolio(self, data: Dict[str, Any]) -> WalletPortfolio:
+    def _deserialize_portfolio(self, data: dict[str, Any]) -> WalletPortfolio:
         """Deserialize portfolio from cache."""
         eth_data = data["eth_balance"]
         eth_balance = EthBalance(
@@ -521,7 +500,7 @@ class EthereumClient:
             transaction_count=data["transaction_count"],
         )
 
-    def _serialize_activity(self, activity: WalletActivity) -> Dict[str, Any]:
+    def _serialize_activity(self, activity: WalletActivity) -> dict[str, Any]:
         """Serialize activity for caching."""
         return {
             "address": activity.address,
@@ -531,7 +510,7 @@ class EthereumClient:
             "days_since_last_transaction": activity.days_since_last_transaction,
         }
 
-    def _deserialize_activity(self, data: Dict[str, Any]) -> WalletActivity:
+    def _deserialize_activity(self, data: dict[str, Any]) -> WalletActivity:
         """Deserialize activity from cache."""
         return WalletActivity(
             address=data["address"],
@@ -543,7 +522,7 @@ class EthereumClient:
             days_since_last_transaction=data.get("days_since_last_transaction"),
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get client statistics."""
         return {
             "portfolio_requests": self._stats["portfolio_requests"],

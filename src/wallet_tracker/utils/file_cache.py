@@ -1,14 +1,14 @@
 """File-based cache implementation using diskcache."""
 
+import asyncio
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Any, Dict, List
-import asyncio
+from typing import Any
 
 import diskcache
 
-from .cache_interface import CacheInterface, CacheError, CacheOperationError
+from .cache_interface import CacheInterface, CacheOperationError
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +17,11 @@ class FileCache(CacheInterface):
     """File-based cache implementation using diskcache."""
 
     def __init__(
-            self,
-            cache_dir: Path,
-            default_ttl: int = 3600,
-            max_size_mb: int = 500,
-            key_prefix: str = "wallet_tracker:",
+        self,
+        cache_dir: Path,
+        default_ttl: int = 3600,
+        max_size_mb: int = 500,
+        key_prefix: str = "wallet_tracker:",
     ):
         """Initialize file cache.
 
@@ -36,7 +36,7 @@ class FileCache(CacheInterface):
         self.max_size_mb = max_size_mb
         self.key_prefix = key_prefix
 
-        self._cache: Optional[diskcache.Cache] = None
+        self._cache: diskcache.Cache | None = None
         self._stats = {
             "hits": 0,
             "misses": 0,
@@ -58,7 +58,7 @@ class FileCache(CacheInterface):
                 self._cache = diskcache.Cache(
                     directory=str(self.cache_dir),
                     size_limit=max_size_bytes,
-                    eviction_policy='least-recently-used',
+                    eviction_policy="least-recently-used",
                     cull_limit=10,  # Remove 10% when culling
                 )
 
@@ -75,7 +75,7 @@ class FileCache(CacheInterface):
         """Create prefixed cache key."""
         return f"{self.key_prefix}{key}"
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from file cache."""
         try:
             cache = self._get_cache()
@@ -99,7 +99,7 @@ class FileCache(CacheInterface):
             logger.error(f"File cache get error for key '{key}': {e}")
             raise CacheOperationError(f"File cache get failed: {e}") from e
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in file cache."""
         try:
             cache = self._get_cache()
@@ -196,7 +196,7 @@ class FileCache(CacheInterface):
             logger.error(f"File cache clear error: {e}")
             raise CacheOperationError(f"File cache clear failed: {e}") from e
 
-    async def get_many(self, keys: List[str]) -> Dict[str, Any]:
+    async def get_many(self, keys: list[str]) -> dict[str, Any]:
         """Get multiple values from file cache."""
         if not keys:
             return {}
@@ -227,7 +227,7 @@ class FileCache(CacheInterface):
             logger.error(f"File cache get_many error: {e}")
             raise CacheOperationError(f"File cache get_many failed: {e}") from e
 
-    async def set_many(self, mapping: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_many(self, mapping: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in file cache."""
         if not mapping:
             return True
@@ -301,7 +301,7 @@ class FileCache(CacheInterface):
             logger.error(f"File cache health check failed: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get file cache statistics."""
         total_operations = self._stats["hits"] + self._stats["misses"]
         hit_rate = (self._stats["hits"] / total_operations * 100) if total_operations > 0 else 0
@@ -323,11 +323,13 @@ class FileCache(CacheInterface):
         if self._cache:
             try:
                 cache_stats = self._cache.stats()
-                stats.update({
-                    "current_size_bytes": cache_stats[0],
-                    "current_size_mb": round(cache_stats[0] / (1024 * 1024), 2),
-                    "key_count": cache_stats[1],
-                })
+                stats.update(
+                    {
+                        "current_size_bytes": cache_stats[0],
+                        "current_size_mb": round(cache_stats[0] / (1024 * 1024), 2),
+                        "key_count": cache_stats[1],
+                    }
+                )
             except Exception:
                 pass  # Stats not available
 

@@ -1,27 +1,27 @@
 """Tests for Ethereum client."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
-import aiohttp
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
+import pytest
+
+from wallet_tracker.clients import (
+    APIError,
+    EthBalance,
+    EthereumClient,
+    InvalidAddressError,
+    TokenBalance,
+    WalletPortfolio,
+    calculate_token_value,
+    format_token_amount,
+    is_valid_ethereum_address,
+    normalize_address,
+    wei_to_eth,
+)
 from wallet_tracker.config import EthereumConfig
 from wallet_tracker.utils import CacheManager
-from wallet_tracker.clients import (
-    EthereumClient,
-    EthereumClientError,
-    InvalidAddressError,
-    APIError,
-    TokenBalance,
-    EthBalance,
-    WalletPortfolio,
-    normalize_address,
-    is_valid_ethereum_address,
-    wei_to_eth,
-    format_token_amount,
-    calculate_token_value,
-)
 
 
 class TestEthereumTypes:
@@ -147,33 +147,26 @@ class TestEthereumClient:
                 "tokenBalances": [
                     {
                         "contractAddress": "0xA0b86a33E6441e94bB0a8d0F7E5F8D69E2C0e5a0",
-                        "tokenBalance": "0xF4240"  # 1000000 in hex (1 USDC)
+                        "tokenBalance": "0xF4240",  # 1000000 in hex (1 USDC)
                     }
                 ]
             }
         }
 
         metadata_response = {
-            "result": [
-                {
-                    "symbol": "USDC",
-                    "name": "USD Coin",
-                    "decimals": 6,
-                    "logo": "https://example.com/usdc.png"
-                }
-            ]
+            "result": [{"symbol": "USDC", "name": "USD Coin", "decimals": 6, "logo": "https://example.com/usdc.png"}]
         }
 
-        with patch.object(ethereum_client, '_make_request') as mock_request:
+        with patch.object(ethereum_client, "_make_request") as mock_request:
             # Set up mock responses in order
             mock_request.side_effect = [
-                eth_balance_response,     # ETH balance
+                eth_balance_response,  # ETH balance
                 token_balances_response,  # Token balances
-                metadata_response,        # Token metadata
+                metadata_response,  # Token metadata
             ]
 
             # Mock ETH price
-            with patch.object(ethereum_client, '_get_eth_price', return_value=Decimal("2000")):
+            with patch.object(ethereum_client, "_get_eth_price", return_value=Decimal("2000")):
                 portfolio = await ethereum_client.get_wallet_portfolio(wallet_address)
 
                 # Verify portfolio structure
@@ -204,7 +197,7 @@ class TestEthereumClient:
             },
             "token_balances": [],
             "total_value_usd": "2000.0",
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
             "transaction_count": 10,
         }
 
@@ -222,7 +215,7 @@ class TestEthereumClient:
         """Test API error handling."""
         wallet_address = "0x742d35Cc6634C0532925a3b8D40e3f337ABC7b86"
 
-        with patch.object(ethereum_client, '_make_request') as mock_request:
+        with patch.object(ethereum_client, "_make_request") as mock_request:
             mock_request.side_effect = APIError("API request failed")
 
             with pytest.raises(APIError):
@@ -284,7 +277,7 @@ class TestEthereumClient:
             eth_balance=eth_balance,
             token_balances=[token_balance],
             total_value_usd=Decimal("2001.0"),
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
             transaction_count=10,
         )
 
@@ -331,7 +324,7 @@ class TestEthereumClientIntegration:
                     portfolio = await ethereum_client.get_wallet_portfolio(
                         vitalik_address,
                         include_metadata=False,  # Skip metadata to reduce API calls
-                        include_prices=False,    # Skip prices to reduce API calls
+                        include_prices=False,  # Skip prices to reduce API calls
                     )
 
                     # Basic validation
@@ -385,6 +378,4 @@ class TestMockHTTPSession:
 # Only mark async tests, not all tests
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test requiring network access"
-    )
+    config.addinivalue_line("markers", "integration: mark test as integration test requiring network access")

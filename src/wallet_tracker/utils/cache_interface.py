@@ -1,15 +1,14 @@
 """Abstract cache interface for consistent caching operations."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Dict, List
-import asyncio
+from typing import Any
 
 
 class CacheInterface(ABC):
     """Abstract interface for cache implementations."""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get a value from cache.
 
         Args:
@@ -21,7 +20,7 @@ class CacheInterface(ABC):
         pass
 
     @abstractmethod
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set a value in cache.
 
         Args:
@@ -68,7 +67,7 @@ class CacheInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_many(self, keys: List[str]) -> Dict[str, Any]:
+    async def get_many(self, keys: list[str]) -> dict[str, Any]:
         """Get multiple values from cache.
 
         Args:
@@ -80,7 +79,7 @@ class CacheInterface(ABC):
         pass
 
     @abstractmethod
-    async def set_many(self, mapping: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_many(self, mapping: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in cache.
 
         Args:
@@ -107,7 +106,7 @@ class CacheInterface(ABC):
         pass
 
     @abstractmethod
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -118,14 +117,17 @@ class CacheInterface(ABC):
 
 class CacheError(Exception):
     """Base exception for cache operations."""
+
     pass
 
 
 class CacheConnectionError(CacheError):
     """Cache connection error."""
+
     pass
 
 
 class CacheOperationError(CacheError):
     """Cache operation error."""
+
     pass

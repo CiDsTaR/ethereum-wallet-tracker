@@ -1,13 +1,11 @@
 """Hybrid cache implementation with Redis primary and file fallback."""
 
 import logging
-from typing import Optional, Any, Dict, List
-import asyncio
+from typing import Any
 
-from .cache_interface import CacheInterface, CacheError, CacheConnectionError
-from .redis_cache import RedisCache
+from .cache_interface import CacheConnectionError, CacheError, CacheInterface
 from .file_cache import FileCache
-
+from .redis_cache import RedisCache
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +82,7 @@ class HybridCache(CacheInterface):
             else:
                 raise
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value with Redis primary, file fallback."""
         result, backend = await self._try_redis_operation("get", self.redis_cache.get, key)
 
@@ -102,7 +100,7 @@ class HybridCache(CacheInterface):
 
         return result
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in both caches when possible."""
         primary_result, backend = await self._try_redis_operation("set", self.redis_cache.set, key, value, ttl)
 
@@ -168,7 +166,7 @@ class HybridCache(CacheInterface):
 
         return redis_success or file_success
 
-    async def get_many(self, keys: List[str]) -> Dict[str, Any]:
+    async def get_many(self, keys: list[str]) -> dict[str, Any]:
         """Get multiple values with Redis primary, file fallback."""
         result, backend = await self._try_redis_operation("get_many", self.redis_cache.get_many, keys)
 
@@ -187,7 +185,7 @@ class HybridCache(CacheInterface):
 
         return result
 
-    async def set_many(self, mapping: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_many(self, mapping: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in both caches when possible."""
         primary_result, backend = await self._try_redis_operation("set_many", self.redis_cache.set_many, mapping, ttl)
 
@@ -225,7 +223,7 @@ class HybridCache(CacheInterface):
         # At least one cache should be healthy
         return redis_healthy or file_healthy
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get combined cache statistics."""
         redis_stats = self.redis_cache.get_stats()
         file_stats = self.file_cache.get_stats()
@@ -241,8 +239,9 @@ class HybridCache(CacheInterface):
                 "fallbacks": self._stats["fallbacks"],
                 "errors": self._stats["errors"],
                 "fallback_rate_percent": round(
-                    (self._stats["fallbacks"] / max(1, self._stats["redis_operations"] + self._stats["fallbacks"])) * 100,
-                    2
+                    (self._stats["fallbacks"] / max(1, self._stats["redis_operations"] + self._stats["fallbacks"]))
+                    * 100,
+                    2,
                 ),
             },
         }

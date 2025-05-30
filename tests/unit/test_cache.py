@@ -1,28 +1,25 @@
 """Tests for caching system."""
 
-import asyncio
 import platform
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
-import json
+from unittest.mock import patch
+
 import pytest
 
-from wallet_tracker.config import CacheConfig, CacheBackend
+from wallet_tracker.config import CacheBackend, CacheConfig
 from wallet_tracker.utils import (
-    CacheInterface,
-    CacheError,
-    CacheConnectionError,
-    FileCache,
     CacheFactory,
+    CacheInterface,
     CacheManager,
+    FileCache,
 )
 
 # Skip file cache tests on Windows
 skip_on_windows = pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="File cache tests have permission issues on Windows"
+    platform.system() == "Windows", reason="File cache tests have permission issues on Windows"
 )
+
 
 class TestFileCache:
     """Test file cache implementation."""
@@ -141,7 +138,7 @@ class TestCacheFactory:
         cache = CacheFactory.create_cache(config)
         assert isinstance(cache, FileCache)
 
-    @patch('wallet_tracker.utils.redis_cache.redis')
+    @patch("wallet_tracker.utils.redis_cache.redis")
     def test_create_redis_cache(self, mock_redis):
         """Test creating Redis cache."""
         config = CacheConfig(

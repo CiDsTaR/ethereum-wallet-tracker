@@ -1,9 +1,9 @@
 """Type definitions for Ethereum client data structures."""
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from typing import Any
 
 
 @dataclass
@@ -16,9 +16,9 @@ class TokenBalance:
     decimals: int
     balance_raw: str
     balance_formatted: Decimal
-    price_usd: Optional[Decimal] = None
-    value_usd: Optional[Decimal] = None
-    logo_url: Optional[str] = None
+    price_usd: Decimal | None = None
+    value_usd: Decimal | None = None
+    logo_url: str | None = None
     is_verified: bool = False
 
 
@@ -28,8 +28,8 @@ class EthBalance:
 
     balance_wei: str
     balance_eth: Decimal
-    price_usd: Optional[Decimal] = None
-    value_usd: Optional[Decimal] = None
+    price_usd: Decimal | None = None
+    value_usd: Decimal | None = None
 
 
 @dataclass
@@ -38,12 +38,12 @@ class WalletPortfolio:
 
     address: str
     eth_balance: EthBalance
-    token_balances: List[TokenBalance]
+    token_balances: list[TokenBalance]
     total_value_usd: Decimal
     last_updated: datetime
     transaction_count: int
-    last_transaction_hash: Optional[str] = None
-    last_transaction_timestamp: Optional[datetime] = None
+    last_transaction_hash: str | None = None
+    last_transaction_timestamp: datetime | None = None
 
 
 @dataclass
@@ -54,11 +54,11 @@ class TokenMetadata:
     symbol: str
     name: str
     decimals: int
-    logo_url: Optional[str] = None
+    logo_url: str | None = None
     is_verified: bool = False
-    price_usd: Optional[Decimal] = None
-    market_cap_usd: Optional[Decimal] = None
-    volume_24h_usd: Optional[Decimal] = None
+    price_usd: Decimal | None = None
+    market_cap_usd: Decimal | None = None
+    volume_24h_usd: Decimal | None = None
 
 
 @dataclass
@@ -82,12 +82,12 @@ class WalletActivity:
     """Wallet activity summary."""
 
     address: str
-    first_transaction: Optional[TransactionInfo]
-    last_transaction: Optional[TransactionInfo]
+    first_transaction: TransactionInfo | None
+    last_transaction: TransactionInfo | None
     transaction_count: int
     total_gas_used: int
     is_active: bool  # Active in last X days based on threshold
-    days_since_last_transaction: Optional[int] = None
+    days_since_last_transaction: int | None = None
 
 
 @dataclass
@@ -95,22 +95,22 @@ class AlchemyPortfolioResponse:
     """Raw response from Alchemy Portfolio API."""
 
     address: str
-    tokenBalances: List[Dict[str, Any]]
-    pageKey: Optional[str] = None
+    tokenBalances: list[dict[str, Any]]
+    pageKey: str | None = None
 
 
 @dataclass
 class AlchemyTokenMetadataResponse:
     """Raw response from Alchemy Token Metadata API."""
 
-    tokens: List[Dict[str, Any]]
+    tokens: list[dict[str, Any]]
 
 
 @dataclass
 class AlchemyPriceResponse:
     """Raw response from Alchemy Token Prices API."""
 
-    data: List[Dict[str, Any]]
+    data: list[dict[str, Any]]
 
 
 # Constants for well-known tokens
@@ -210,7 +210,7 @@ def format_token_amount(raw_amount: str, decimals: int) -> Decimal:
     return Decimal(raw_amount) / Decimal(10**decimals)
 
 
-def calculate_token_value(balance: Decimal, price_usd: Optional[Decimal]) -> Optional[Decimal]:
+def calculate_token_value(balance: Decimal, price_usd: Decimal | None) -> Decimal | None:
     """Calculate USD value of token balance."""
     if price_usd is None:
         return None

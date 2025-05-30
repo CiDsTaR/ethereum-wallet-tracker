@@ -2,13 +2,13 @@
 
 import json
 import logging
-from typing import Optional, Any, Dict, List
-import asyncio
+from typing import Any
 
 import redis.asyncio as redis
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import RedisError
 
-from .cache_interface import CacheInterface, CacheError, CacheConnectionError, CacheOperationError
+from .cache_interface import CacheConnectionError, CacheError, CacheInterface, CacheOperationError
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +17,12 @@ class RedisCache(CacheInterface):
     """Redis-based cache implementation."""
 
     def __init__(
-            self,
-            redis_url: str,
-            password: Optional[str] = None,
-            default_ttl: int = 3600,
-            key_prefix: str = "wallet_tracker:",
-            max_connections: int = 20,
+        self,
+        redis_url: str,
+        password: str | None = None,
+        default_ttl: int = 3600,
+        key_prefix: str = "wallet_tracker:",
+        max_connections: int = 20,
     ):
         """Initialize Redis cache.
 
@@ -39,8 +39,8 @@ class RedisCache(CacheInterface):
         self.key_prefix = key_prefix
         self.max_connections = max_connections
 
-        self._client: Optional[redis.Redis] = None
-        self._connection_pool: Optional[redis.ConnectionPool] = None
+        self._client: redis.Redis | None = None
+        self._connection_pool: redis.ConnectionPool | None = None
         self._stats = {
             "hits": 0,
             "misses": 0,
@@ -95,7 +95,7 @@ class RedisCache(CacheInterface):
         except (TypeError, ValueError) as e:
             raise CacheOperationError(f"Failed to deserialize value: {e}") from e
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from Redis cache."""
         try:
             client = await self._get_client()
@@ -116,7 +116,7 @@ class RedisCache(CacheInterface):
             logger.error(f"Redis get error for key '{key}': {e}")
             raise CacheOperationError(f"Redis get failed: {e}") from e
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in Redis cache."""
         try:
             client = await self._get_client()
@@ -201,7 +201,7 @@ class RedisCache(CacheInterface):
             logger.error(f"Redis clear error: {e}")
             raise CacheOperationError(f"Redis clear failed: {e}") from e
 
-    async def get_many(self, keys: List[str]) -> Dict[str, Any]:
+    async def get_many(self, keys: list[str]) -> dict[str, Any]:
         """Get multiple values from Redis cache."""
         if not keys:
             return {}
@@ -213,7 +213,7 @@ class RedisCache(CacheInterface):
             values = await client.mget(cache_keys)
 
             result = {}
-            for i, (original_key, value) in enumerate(zip(keys, values)):
+            for i, (original_key, value) in enumerate(zip(keys, values, strict=False)):
                 if value is not None:
                     try:
                         result[original_key] = self._deserialize(value)
@@ -234,7 +234,7 @@ class RedisCache(CacheInterface):
             logger.error(f"Redis get_many error: {e}")
             raise CacheOperationError(f"Redis get_many failed: {e}") from e
 
-    async def set_many(self, mapping: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_many(self, mapping: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in Redis cache."""
         if not mapping:
             return True
@@ -288,7 +288,7 @@ class RedisCache(CacheInterface):
             logger.error(f"Redis health check failed: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get Redis cache statistics."""
         total_operations = self._stats["hits"] + self._stats["misses"]
         hit_rate = (self._stats["hits"] / total_operations * 100) if total_operations > 0 else 0

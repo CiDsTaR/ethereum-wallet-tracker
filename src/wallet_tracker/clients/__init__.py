@@ -6,30 +6,28 @@ This package provides clients for interacting with various APIs:
 - Google Sheets for data input/output
 """
 
-from .ethereum_client import EthereumClient, EthereumClientError, InvalidAddressError, APIError
+from .ethereum_client import APIError, EthereumClient, EthereumClientError, InvalidAddressError
 from .ethereum_types import (
-    TokenBalance,
     EthBalance,
-    WalletPortfolio,
+    TokenBalance,
     TokenMetadata,
     TransactionInfo,
     WalletActivity,
-    normalize_address,
-    is_valid_ethereum_address,
-    wei_to_eth,
-    format_token_amount,
+    WalletPortfolio,
     calculate_token_value,
+    format_token_amount,
+    is_valid_ethereum_address,
+    normalize_address,
+    wei_to_eth,
 )
 
 __all__ = [
     # Main client
     "EthereumClient",
-
     # Exceptions
     "EthereumClientError",
     "InvalidAddressError",
     "APIError",
-
     # Data types
     "TokenBalance",
     "EthBalance",
@@ -37,7 +35,6 @@ __all__ = [
     "TokenMetadata",
     "TransactionInfo",
     "WalletActivity",
-
     # Utility functions
     "normalize_address",
     "is_valid_ethereum_address",
