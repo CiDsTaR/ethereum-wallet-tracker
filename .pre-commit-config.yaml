@@ -24,6 +24,8 @@ repos:
       - id: mypy
         additional_dependencies: [
           pydantic>=2.11.5,
+          pytest>=8.3.5,
+          python-dotenv>=1.1.0,
           pytest,
           types-requests,
           types-redis,

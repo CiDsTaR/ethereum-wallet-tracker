@@ -23,7 +23,7 @@ from wallet_tracker.config import (
 class TestEthereumConfig:
     """Test Ethereum configuration."""
 
-    def test_valid_config(self):
+    def test_valid_config(self) -> None:
         """Test valid Ethereum configuration."""
         config = EthereumConfig(
             alchemy_api_key="test_key",
@@ -32,12 +32,12 @@ class TestEthereumConfig:
         assert config.alchemy_api_key == "test_key"
         assert config.rate_limit == 100  # default
 
-    def test_invalid_rpc_url(self):
+    def test_invalid_rpc_url(self) -> None:
         """Test invalid RPC URL validation."""
         with pytest.raises(ValidationError):
             EthereumConfig(alchemy_api_key="test_key", rpc_url="invalid_url")
 
-    def test_rate_limit_validation(self):
+    def test_rate_limit_validation(self) -> None:
         """Test rate limit validation."""
         with pytest.raises(ValidationError):
             EthereumConfig(
@@ -50,7 +50,7 @@ class TestEthereumConfig:
 class TestGoogleSheetsConfig:
     """Test Google Sheets configuration."""
 
-    def test_valid_config_with_existing_file(self):
+    def test_valid_config_with_existing_file(self) -> None:
         """Test valid configuration with existing credentials file."""
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             f.write(b'{"test": "credentials"}')
@@ -62,7 +62,7 @@ class TestGoogleSheetsConfig:
         finally:
             temp_path.unlink()
 
-    def test_invalid_config_missing_file(self):
+    def test_invalid_config_missing_file(self) -> None:
         """Test invalid configuration with missing credentials file."""
         with pytest.raises(ValidationError):
             GoogleSheetsConfig(credentials_file=Path("/nonexistent/file.json"))
@@ -71,7 +71,7 @@ class TestGoogleSheetsConfig:
 class TestSettings:
     """Test settings management."""
 
-    def test_env_loading_with_custom_file(self):
+    def test_env_loading_with_custom_file(self) -> None:
         """Test loading environment from custom file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
             f.write("TEST_VAR=test_value\n")
@@ -96,7 +96,7 @@ class TestSettings:
             "BATCH_SIZE": "25",
         },
     )
-    def test_config_loading_from_env(self):
+    def test_config_loading_from_env(self) -> None:
         """Test configuration loading from environment variables."""
         # Create a temporary credentials file
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
@@ -118,7 +118,7 @@ class TestSettings:
         finally:
             temp_creds.unlink()
 
-    def test_missing_required_env_var(self):
+    def test_missing_required_env_var(self) -> None:
         """Test error when required environment variable is missing."""
         # Create settings without loading .env file
         settings = Settings(env_file=Path("nonexistent.env"))
@@ -129,7 +129,7 @@ class TestSettings:
         ):
             settings.load_config()
 
-    def test_config_validation_results(self):
+    def test_config_validation_results(self) -> None:
         """Test configuration validation results."""
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             f.write(b'{"test": "credentials"}')
@@ -155,7 +155,7 @@ class TestSettings:
         finally:
             temp_creds.unlink()
 
-    def test_config_caching(self):
+    def test_config_caching(self) -> None:
         """Test that configuration is cached."""
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             f.write(b'{"test": "credentials"}')
@@ -179,7 +179,7 @@ class TestSettings:
         finally:
             temp_creds.unlink()
 
-    def test_config_reload(self):
+    def test_config_reload(self) -> None:
         """Test configuration reloading."""
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             f.write(b'{"test": "credentials"}')
@@ -212,7 +212,7 @@ class TestSettings:
 class TestAppConfig:
     """Test main application configuration."""
 
-    def test_environment_helpers(self):
+    def test_environment_helpers(self) -> None:
         """Test environment helper methods."""
         config = AppConfig(
             environment=Environment.PRODUCTION,
@@ -230,7 +230,7 @@ class TestAppConfig:
         assert config.is_production() is False
         assert config.is_development() is True
 
-    def test_cache_backend_helper(self):
+    def test_cache_backend_helper(self) -> None:
         """Test cache backend helper method."""
         config = AppConfig(
             environment=Environment.DEVELOPMENT,
