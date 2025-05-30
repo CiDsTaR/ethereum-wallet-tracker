@@ -23,6 +23,8 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [
+          pydantic>=2.11.5,
+          pytest,
           types-requests,
           types-redis,
           pandas-stubs,
