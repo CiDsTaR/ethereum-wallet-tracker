@@ -94,6 +94,11 @@ warn_unreachable = true
 strict_equality = true
 
 [tool.pytest.ini_options]
+markers = [
+    "integration: mark test as integration test requiring network access",
+    "slow: mark test as slow running",
+    "unit: mark test as unit test"
+]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
