@@ -1,10 +1,10 @@
 """CoinGecko client for token price data."""
 
 import logging
-import asyncio
-from typing import Optional, List, Dict, Any
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
+from typing import Any
+
 import aiohttp
 from asyncio_throttle import Throttler
 
@@ -13,30 +13,30 @@ from ..utils import CacheManager
 from .coingecko_types import (
     TokenPrice,
     TokenSearchResult,
-    ContractPriceResponse,
-    COINGECKO_TOKEN_IDS,
-    get_coingecko_id,
-    normalize_coingecko_price_data,
     create_batch_ids_string,
+    get_coingecko_id,
     is_stablecoin,
+    normalize_coingecko_price_data,
 )
-
 
 logger = logging.getLogger(__name__)
 
 
 class CoinGeckoClientError(Exception):
     """Base exception for CoinGecko client errors."""
+
     pass
 
 
 class APIError(CoinGeckoClientError):
     """API request error."""
+
     pass
 
 
 class RateLimitError(CoinGeckoClientError):
     """Rate limit exceeded error."""
+
     pass
 
 
@@ -46,8 +46,8 @@ class CoinGeckoClient:
     def __init__(
         self,
         config: CoinGeckoConfig,
-        cache_manager: Optional[CacheManager] = None,
-        session: Optional[aiohttp.ClientSession] = None,
+        cache_manager: CacheManager | None = None,
+        session: aiohttp.ClientSession | None = None,
     ):
         """Initialize CoinGecko client.
 
@@ -113,10 +113,10 @@ class CoinGeckoClient:
     async def _make_request(
         self,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        cache_key: Optional[str] = None,
-        cache_ttl: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        cache_key: str | None = None,
+        cache_ttl: int | None = None,
+    ) -> dict[str, Any]:
         """Make HTTP request with rate limiting and caching.
 
         Args:
@@ -150,9 +150,7 @@ class CoinGeckoClient:
 
                 # Cache successful response
                 if cache_key and self.cache_manager and cache_ttl:
-                    await self.cache_manager.get_price_cache().set(
-                        cache_key, response_data, ttl=cache_ttl
-                    )
+                    await self.cache_manager.get_price_cache().set(cache_key, response_data, ttl=cache_ttl)
 
                 return response_data
 
@@ -164,7 +162,7 @@ class CoinGeckoClient:
                 logger.error(f"CoinGecko API request failed: {e}")
                 raise APIError(f"Request to {url} failed: {e}") from e
 
-    async def _handle_response(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
+    async def _handle_response(self, response: aiohttp.ClientResponse) -> dict[str, Any]:
         """Handle HTTP response and extract data."""
         if response.status == 200:
             return await response.json()
@@ -183,7 +181,7 @@ class CoinGeckoClient:
             error_text = await response.text()
             raise APIError(f"HTTP {response.status}: {error_text}")
 
-    async def get_token_price(self, token_id: str, include_market_data: bool = False) -> Optional[TokenPrice]:
+    async def get_token_price(self, token_id: str, include_market_data: bool = False) -> TokenPrice | None:
         """Get price for a single token by CoinGecko ID.
 
         Args:
@@ -212,7 +210,7 @@ class CoinGeckoClient:
                     url,
                     params=params,
                     cache_key=cache_key,
-                    cache_ttl=300  # 5 minutes
+                    cache_ttl=300,  # 5 minutes
                 )
 
                 if not response:
@@ -244,7 +242,7 @@ class CoinGeckoClient:
                     self.simple_price_url,
                     params=params,
                     cache_key=cache_key,
-                    cache_ttl=300  # 5 minutes
+                    cache_ttl=300,  # 5 minutes
                 )
 
                 if not response or token_id not in response:
@@ -254,7 +252,9 @@ class CoinGeckoClient:
                 price_data = {
                     "id": token_id,
                     "usd": token_data.get("usd"),
-                    "last_updated": datetime.fromtimestamp(token_data["last_updated_at"]).isoformat() if "last_updated_at" in token_data else None,
+                    "last_updated": datetime.fromtimestamp(token_data["last_updated_at"]).isoformat()
+                    if "last_updated_at" in token_data
+                    else None,
                 }
 
             self._stats["price_requests"] += 1
@@ -265,10 +265,8 @@ class CoinGeckoClient:
             return None
 
     async def get_token_prices_batch(
-        self,
-        token_ids: List[str],
-        include_market_data: bool = False
-    ) -> Dict[str, TokenPrice]:
+        self, token_ids: list[str], include_market_data: bool = False
+    ) -> dict[str, TokenPrice]:
         """Get prices for multiple tokens in batch.
 
         Args:
@@ -320,7 +318,7 @@ class CoinGeckoClient:
                     url,
                     params=params,
                     cache_key=cache_key,
-                    cache_ttl=300  # 5 minutes
+                    cache_ttl=300,  # 5 minutes
                 )
 
                 if response:
@@ -337,7 +335,9 @@ class CoinGeckoClient:
                             price_data = {
                                 "id": token_id,
                                 "usd": token_data.get("usd"),
-                                "last_updated": datetime.fromtimestamp(token_data["last_updated_at"]).isoformat() if "last_updated_at" in token_data else None,
+                                "last_updated": datetime.fromtimestamp(token_data["last_updated_at"]).isoformat()
+                                if "last_updated_at" in token_data
+                                else None,
                             }
                             price = normalize_coingecko_price_data(price_data)
                             all_prices[token_id] = price
@@ -351,10 +351,8 @@ class CoinGeckoClient:
         return all_prices
 
     async def get_token_price_by_contract(
-        self,
-        contract_address: str,
-        include_market_data: bool = False
-    ) -> Optional[TokenPrice]:
+        self, contract_address: str, include_market_data: bool = False
+    ) -> TokenPrice | None:
         """Get token price by Ethereum contract address.
 
         Args:
@@ -381,18 +379,20 @@ class CoinGeckoClient:
             }
 
             if include_market_data:
-                params.update({
-                    "include_market_cap": True,
-                    "include_24hr_vol": True,
-                    "include_24hr_change": True,
-                    "include_last_updated_at": True,
-                })
+                params.update(
+                    {
+                        "include_market_cap": True,
+                        "include_24hr_vol": True,
+                        "include_24hr_change": True,
+                        "include_last_updated_at": True,
+                    }
+                )
 
             response = await self._make_request(
                 self.contract_url,
                 params=params,
                 cache_key=cache_key,
-                cache_ttl=300  # 5 minutes
+                cache_ttl=300,  # 5 minutes
             )
 
             if not response or normalized_address not in response:
@@ -419,10 +419,8 @@ class CoinGeckoClient:
             return None
 
     async def get_token_prices_by_contracts(
-        self,
-        contract_addresses: List[str],
-        include_market_data: bool = False
-    ) -> Dict[str, TokenPrice]:
+        self, contract_addresses: list[str], include_market_data: bool = False
+    ) -> dict[str, TokenPrice]:
         """Get prices for multiple tokens by contract addresses.
 
         Args:
@@ -453,10 +451,7 @@ class CoinGeckoClient:
 
         # Get prices for known tokens (more efficient)
         if known_tokens:
-            known_prices = await self.get_token_prices_batch(
-                list(known_tokens.keys()),
-                include_market_data
-            )
+            known_prices = await self.get_token_prices_batch(list(known_tokens.keys()), include_market_data)
 
             for coingecko_id, price in known_prices.items():
                 contract_addr = known_tokens[coingecko_id]
@@ -470,7 +465,7 @@ class CoinGeckoClient:
             batch_size = 50  # Conservative batch size
 
             for i in range(0, len(unknown_addresses), batch_size):
-                batch = unknown_addresses[i:i + batch_size]
+                batch = unknown_addresses[i : i + batch_size]
                 batch_str = ",".join(batch)
 
                 cache_key = f"contract_batch:{hash(batch_str)}:{include_market_data}"
@@ -482,18 +477,20 @@ class CoinGeckoClient:
                     }
 
                     if include_market_data:
-                        params.update({
-                            "include_market_cap": True,
-                            "include_24hr_vol": True,
-                            "include_24hr_change": True,
-                            "include_last_updated_at": True,
-                        })
+                        params.update(
+                            {
+                                "include_market_cap": True,
+                                "include_24hr_vol": True,
+                                "include_24hr_change": True,
+                                "include_last_updated_at": True,
+                            }
+                        )
 
                     response = await self._make_request(
                         self.contract_url,
                         params=params,
                         cache_key=cache_key,
-                        cache_ttl=300  # 5 minutes
+                        cache_ttl=300,  # 5 minutes
                     )
 
                     if response:
@@ -503,9 +500,13 @@ class CoinGeckoClient:
                                     "id": f"contract_{addr}",
                                     "contract_address": addr,
                                     "usd": contract_data.get("usd"),
-                                    "usd_market_cap": contract_data.get("usd_market_cap") if include_market_data else None,
+                                    "usd_market_cap": contract_data.get("usd_market_cap")
+                                    if include_market_data
+                                    else None,
                                     "usd_24h_vol": contract_data.get("usd_24h_vol") if include_market_data else None,
-                                    "usd_24h_change": contract_data.get("usd_24h_change") if include_market_data else None,
+                                    "usd_24h_change": contract_data.get("usd_24h_change")
+                                    if include_market_data
+                                    else None,
                                     "last_updated_at": contract_data.get("last_updated_at"),
                                 }
 
@@ -520,7 +521,7 @@ class CoinGeckoClient:
 
         return all_prices
 
-    async def search_tokens(self, query: str, limit: int = 10) -> List[TokenSearchResult]:
+    async def search_tokens(self, query: str, limit: int = 10) -> list[TokenSearchResult]:
         """Search for tokens by name or symbol.
 
         Args:
@@ -539,7 +540,7 @@ class CoinGeckoClient:
                 self.search_url,
                 params=params,
                 cache_key=cache_key,
-                cache_ttl=3600  # 1 hour (search results change less frequently)
+                cache_ttl=3600,  # 1 hour (search results change less frequently)
             )
 
             if not response or "coins" not in response:
@@ -565,7 +566,7 @@ class CoinGeckoClient:
             logger.warning(f"Failed to search tokens for query '{query}': {e}")
             return []
 
-    async def get_eth_price(self) -> Optional[Decimal]:
+    async def get_eth_price(self) -> Decimal | None:
         """Get current ETH price in USD.
 
         Returns:
@@ -574,7 +575,7 @@ class CoinGeckoClient:
         eth_price = await self.get_token_price("ethereum", include_market_data=False)
         return eth_price.current_price_usd if eth_price else None
 
-    async def get_stablecoin_prices(self) -> Dict[str, Decimal]:
+    async def get_stablecoin_prices(self) -> dict[str, Decimal]:
         """Get prices for major stablecoins.
 
         Returns:
@@ -591,7 +592,7 @@ class CoinGeckoClient:
 
         return stablecoin_prices
 
-    async def get_top_tokens_by_market_cap(self, limit: int = 100) -> List[TokenPrice]:
+    async def get_top_tokens_by_market_cap(self, limit: int = 100) -> list[TokenPrice]:
         """Get top tokens by market capitalization.
 
         Args:
@@ -618,7 +619,7 @@ class CoinGeckoClient:
                 url,
                 params=params,
                 cache_key=cache_key,
-                cache_ttl=600  # 10 minutes
+                cache_ttl=600,  # 10 minutes
             )
 
             if not response:
@@ -635,7 +636,7 @@ class CoinGeckoClient:
             logger.warning(f"Failed to get top tokens: {e}")
             return []
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get client statistics."""
         return {
             "price_requests": self._stats["price_requests"],
@@ -684,7 +685,7 @@ class CoinGeckoPriceService:
     def __init__(
         self,
         coingecko_client: CoinGeckoClient,
-        cache_manager: Optional[CacheManager] = None,
+        cache_manager: CacheManager | None = None,
     ):
         """Initialize price service.
 
@@ -697,9 +698,9 @@ class CoinGeckoPriceService:
 
     async def get_wallet_token_prices(
         self,
-        contract_addresses: List[str],
+        contract_addresses: list[str],
         include_eth: bool = True,
-    ) -> Dict[str, Decimal]:
+    ) -> dict[str, Decimal]:
         """Get prices for all tokens in a wallet.
 
         Args:
@@ -720,8 +721,7 @@ class CoinGeckoPriceService:
         # Get token prices by contract
         if contract_addresses:
             token_prices = await self.client.get_token_prices_by_contracts(
-                contract_addresses,
-                include_market_data=False
+                contract_addresses, include_market_data=False
             )
 
             for addr, price_data in token_prices.items():
@@ -746,12 +746,15 @@ class CoinGeckoPriceService:
         for token in top_tokens:
             if token.current_price_usd:
                 cache_key = f"popular_price:{token.token_id}"
-                await self.cache_manager.set_price(token.token_id, {
-                    "usd": str(token.current_price_usd),
-                    "symbol": token.symbol,
-                    "name": token.name,
-                    "last_updated": datetime.now(timezone.utc).isoformat(),
-                })
+                await self.cache_manager.set_price(
+                    token.token_id,
+                    {
+                        "usd": str(token.current_price_usd),
+                        "symbol": token.symbol,
+                        "name": token.name,
+                        "last_updated": datetime.now(UTC).isoformat(),
+                    },
+                )
                 cached_count += 1
 
         logger.info(f"Cached prices for {cached_count} popular tokens")
@@ -759,10 +762,10 @@ class CoinGeckoPriceService:
 
     async def get_price_with_fallback(
         self,
-        contract_address: Optional[str] = None,
-        symbol: Optional[str] = None,
-        coingecko_id: Optional[str] = None,
-    ) -> Optional[Decimal]:
+        contract_address: str | None = None,
+        symbol: str | None = None,
+        coingecko_id: str | None = None,
+    ) -> Decimal | None:
         """Get token price with multiple fallback methods.
 
         Args:

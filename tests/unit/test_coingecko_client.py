@@ -1,25 +1,23 @@
 """Tests for CoinGecko client."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from decimal import Decimal
-from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from wallet_tracker.config import CoinGeckoConfig
-from wallet_tracker.utils import CacheManager
+import pytest
+
 from wallet_tracker.clients import (
+    CoinGeckoAPIError,
     CoinGeckoClient,
     CoinGeckoPriceService,
-    CoinGeckoClientError,
-    CoinGeckoAPIError,
     RateLimitError,
     TokenPrice,
-    TokenSearchResult,
     get_coingecko_id,
-    normalize_coingecko_price_data,
     is_stablecoin,
+    normalize_coingecko_price_data,
 )
 from wallet_tracker.clients.coingecko_client import APIError
+from wallet_tracker.config import CoinGeckoConfig
+from wallet_tracker.utils import CacheManager
 
 
 class TestCoinGeckoTypes:
@@ -150,7 +148,7 @@ class TestCoinGeckoClient:
             }
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             price = await coingecko_client.get_token_price("ethereum")
 
             assert price is not None
@@ -162,7 +160,7 @@ class TestCoinGeckoClient:
         """Test token price retrieval for non-existent token."""
         mock_response = {}
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             price = await coingecko_client.get_token_price("non-existent-token")
             assert price is None
 
@@ -177,10 +175,10 @@ class TestCoinGeckoClient:
             "usd-coin": {
                 "usd": 1.001,
                 "last_updated_at": 1635724800,
-            }
+            },
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             prices = await coingecko_client.get_token_prices_batch(["ethereum", "usd-coin"])
 
             assert len(prices) == 2
@@ -202,7 +200,7 @@ class TestCoinGeckoClient:
             }
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             price = await coingecko_client.get_token_price_by_contract(usdc_address)
 
             assert price is not None
@@ -226,10 +224,10 @@ class TestCoinGeckoClient:
             "tether": {
                 "usd": 0.999,
                 "last_updated_at": 1635724800,
-            }
+            },
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_batch_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_batch_response):
             prices = await coingecko_client.get_token_prices_by_contracts(contracts)
 
             assert len(prices) == 2
@@ -256,11 +254,11 @@ class TestCoinGeckoClient:
                     "name": "Ethereum Classic",
                     "thumb": "https://example.com/etc_thumb.png",
                     "large": "https://example.com/etc_large.png",
-                }
+                },
             ]
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             results = await coingecko_client.search_tokens("ethereum", limit=2)
 
             assert len(results) == 2
@@ -278,7 +276,7 @@ class TestCoinGeckoClient:
             }
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             eth_price = await coingecko_client.get_eth_price()
             assert eth_price == Decimal("2000.50")
 
@@ -293,25 +291,19 @@ class TestCoinGeckoClient:
             "tether": {
                 "usd": 0.999,
                 "last_updated_at": 1635724800,
-            }
+            },
         }
 
-        with patch.object(coingecko_client, '_make_request', return_value=mock_response):
+        with patch.object(coingecko_client, "_make_request", return_value=mock_response):
             # Mock the batch request
-            with patch.object(coingecko_client, 'get_token_prices_batch') as mock_batch:
+            with patch.object(coingecko_client, "get_token_prices_batch") as mock_batch:
                 mock_batch.return_value = {
                     "usd-coin": TokenPrice(
-                        token_id="usd-coin",
-                        symbol="usdc",
-                        name="USD Coin",
-                        current_price_usd=Decimal("1.001")
+                        token_id="usd-coin", symbol="usdc", name="USD Coin", current_price_usd=Decimal("1.001")
                     ),
                     "tether": TokenPrice(
-                        token_id="tether",
-                        symbol="usdt",
-                        name="Tether",
-                        current_price_usd=Decimal("0.999")
-                    )
+                        token_id="tether", symbol="usdt", name="Tether", current_price_usd=Decimal("0.999")
+                    ),
                 }
 
                 stablecoin_prices = await coingecko_client.get_stablecoin_prices()
@@ -329,7 +321,7 @@ class TestCoinGeckoClient:
     @pytest.mark.asyncio
     async def test_rate_limit_in_public_method(self, coingecko_client) -> None:
         """Test that public methods handle rate limits gracefully."""
-        with patch.object(coingecko_client, '_make_request') as mock_request:
+        with patch.object(coingecko_client, "_make_request") as mock_request:
             mock_request.side_effect = RateLimitError("Rate limited")
 
             # Public methods should return None instead of raising
@@ -339,7 +331,7 @@ class TestCoinGeckoClient:
     @pytest.mark.asyncio
     async def test_api_error(self, coingecko_client) -> None:
         """Test API error handling."""
-        with patch.object(coingecko_client, '_make_request') as mock_request:
+        with patch.object(coingecko_client, "_make_request") as mock_request:
             mock_request.side_effect = CoinGeckoAPIError("API error")
 
             # Should return None instead of raising for price requests
@@ -368,7 +360,7 @@ class TestCoinGeckoClient:
     @pytest.mark.asyncio
     async def test_health_check_failure(self, coingecko_client) -> None:
         """Test health check failure."""
-        with patch.object(coingecko_client, '_ensure_session') as mock_session:
+        with patch.object(coingecko_client, "_ensure_session") as mock_session:
             mock_session.side_effect = Exception("Connection failed")
 
             health = await coingecko_client.health_check()
@@ -409,31 +401,25 @@ class TestCoinGeckoPriceService:
         client.get_eth_price = AsyncMock(return_value=Decimal("2000.0"))
 
         # Mock contract prices
-        client.get_token_prices_by_contracts = AsyncMock(return_value={
-            "0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0": TokenPrice(
-                token_id="usd-coin",
-                contract_address="0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0",
-                symbol="usdc",
-                name="USD Coin",
-                current_price_usd=Decimal("1.001")
-            )
-        })
+        client.get_token_prices_by_contracts = AsyncMock(
+            return_value={
+                "0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0": TokenPrice(
+                    token_id="usd-coin",
+                    contract_address="0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0",
+                    symbol="usdc",
+                    name="USD Coin",
+                    current_price_usd=Decimal("1.001"),
+                )
+            }
+        )
 
         # Mock top tokens
-        client.get_top_tokens_by_market_cap = AsyncMock(return_value=[
-            TokenPrice(
-                token_id="ethereum",
-                symbol="eth",
-                name="Ethereum",
-                current_price_usd=Decimal("2000.0")
-            ),
-            TokenPrice(
-                token_id="usd-coin",
-                symbol="usdc",
-                name="USD Coin",
-                current_price_usd=Decimal("1.001")
-            )
-        ])
+        client.get_top_tokens_by_market_cap = AsyncMock(
+            return_value=[
+                TokenPrice(token_id="ethereum", symbol="eth", name="Ethereum", current_price_usd=Decimal("2000.0")),
+                TokenPrice(token_id="usd-coin", symbol="usdc", name="USD Coin", current_price_usd=Decimal("1.001")),
+            ]
+        )
 
         return client
 
@@ -457,10 +443,7 @@ class TestCoinGeckoPriceService:
         """Test getting prices for wallet tokens."""
         contract_addresses = ["0xA0b86a33E6441e94bB0a8d0F7E5F8D69E2C0e5a0"]
 
-        prices = await price_service.get_wallet_token_prices(
-            contract_addresses=contract_addresses,
-            include_eth=True
-        )
+        prices = await price_service.get_wallet_token_prices(contract_addresses=contract_addresses, include_eth=True)
 
         assert "ETH" in prices
         assert prices["ETH"] == Decimal("2000.0")
@@ -478,12 +461,11 @@ class TestCoinGeckoPriceService:
     @pytest.mark.asyncio
     async def test_get_price_with_fallback_coingecko_id(self, price_service, mock_coingecko_client) -> None:
         """Test price fallback with CoinGecko ID."""
-        mock_coingecko_client.get_token_price = AsyncMock(return_value=TokenPrice(
-            token_id="ethereum",
-            symbol="eth",
-            name="Ethereum",
-            current_price_usd=Decimal("2000.0")
-        ))
+        mock_coingecko_client.get_token_price = AsyncMock(
+            return_value=TokenPrice(
+                token_id="ethereum", symbol="eth", name="Ethereum", current_price_usd=Decimal("2000.0")
+            )
+        )
 
         price = await price_service.get_price_with_fallback(coingecko_id="ethereum")
         assert price == Decimal("2000.0")
@@ -491,13 +473,15 @@ class TestCoinGeckoPriceService:
     @pytest.mark.asyncio
     async def test_get_price_with_fallback_contract(self, price_service, mock_coingecko_client) -> None:
         """Test price fallback with contract address."""
-        mock_coingecko_client.get_token_price_by_contract = AsyncMock(return_value=TokenPrice(
-            token_id="usd-coin",
-            contract_address="0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0",
-            symbol="usdc",
-            name="USD Coin",
-            current_price_usd=Decimal("1.001")
-        ))
+        mock_coingecko_client.get_token_price_by_contract = AsyncMock(
+            return_value=TokenPrice(
+                token_id="usd-coin",
+                contract_address="0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0",
+                symbol="usdc",
+                name="USD Coin",
+                current_price_usd=Decimal("1.001"),
+            )
+        )
 
         price = await price_service.get_price_with_fallback(
             contract_address="0xA0b86a33E6441e94bB0a8d0f7E5F8D69E2C0e5a0"
@@ -541,7 +525,7 @@ class TestCoinGeckoIntegration:
     @pytest.mark.asyncio
     @pytest.mark.skipif(
         True,  # Skip by default since it requires network
-        reason="Integration test requires network access"
+        reason="Integration test requires network access",
     )
     async def test_real_api_integration(self, real_coingecko_config) -> None:
         """Test integration with real CoinGecko API."""
@@ -610,7 +594,7 @@ class TestCoinGeckoErrorHandling:
 
         try:
             # Mock _ensure_session to raise an exception
-            with patch.object(client, '_ensure_session', side_effect=Exception("Connection failed")):
+            with patch.object(client, "_ensure_session", side_effect=Exception("Connection failed")):
                 # The exception should be raised directly since it's outside the try-catch in _make_request
                 with pytest.raises(Exception, match="Connection failed"):
                     await client._make_request("https://test.com")
@@ -653,11 +637,7 @@ class TestCoinGeckoCaching:
 
         try:
             # This should hit cache and not make HTTP request
-            result = await client._make_request(
-                "https://test.com",
-                cache_key="test_key",
-                cache_ttl=300
-            )
+            result = await client._make_request("https://test.com", cache_key="test_key", cache_ttl=300)
 
             assert result == cached_data
             price_cache.get.assert_called_once_with("test_key")

@@ -1,9 +1,9 @@
 """Type definitions for CoinGecko API data structures."""
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from typing import Any
 
 
 @dataclass
@@ -11,15 +11,15 @@ class TokenPrice:
     """Token price information from CoinGecko."""
 
     token_id: str  # CoinGecko ID (e.g., "ethereum", "usd-coin")
-    contract_address: Optional[str] = None  # Ethereum contract address
+    contract_address: str | None = None  # Ethereum contract address
     symbol: str = ""
     name: str = ""
-    current_price_usd: Optional[Decimal] = None
-    market_cap_usd: Optional[Decimal] = None
-    volume_24h_usd: Optional[Decimal] = None
-    price_change_24h_percent: Optional[Decimal] = None
-    price_change_7d_percent: Optional[Decimal] = None
-    last_updated: Optional[datetime] = None
+    current_price_usd: Decimal | None = None
+    market_cap_usd: Decimal | None = None
+    volume_24h_usd: Decimal | None = None
+    price_change_24h_percent: Decimal | None = None
+    price_change_7d_percent: Decimal | None = None
+    last_updated: datetime | None = None
 
 
 @dataclass
@@ -29,16 +29,16 @@ class TokenSearchResult:
     id: str  # CoinGecko ID
     symbol: str
     name: str
-    contract_address: Optional[str] = None
-    thumb: Optional[str] = None  # Small image URL
-    large: Optional[str] = None  # Large image URL
+    contract_address: str | None = None
+    thumb: str | None = None  # Small image URL
+    large: str | None = None  # Large image URL
 
 
 @dataclass
 class SimplePriceResponse:
     """Response from CoinGecko simple price API."""
 
-    prices: Dict[str, Dict[str, Decimal]]  # token_id -> {currency: price}
+    prices: dict[str, dict[str, Decimal]]  # token_id -> {currency: price}
 
 
 @dataclass
@@ -46,9 +46,9 @@ class ContractPriceResponse:
     """Response from CoinGecko contract price API."""
 
     contract_address: str
-    price_usd: Optional[Decimal] = None
-    market_cap_usd: Optional[Decimal] = None
-    volume_24h_usd: Optional[Decimal] = None
+    price_usd: Decimal | None = None
+    market_cap_usd: Decimal | None = None
+    volume_24h_usd: Decimal | None = None
 
 
 # CoinGecko ID mappings for well-known tokens
@@ -60,7 +60,6 @@ COINGECKO_TOKEN_IDS = {
         "name": "Ethereum",
         "contract_address": None,  # Native token
     },
-
     # Stablecoins
     "0xa0b86a33e6441e94bb0a8d0f7e5f8d69e2c0e5a0": {  # USDC
         "id": "usd-coin",
@@ -80,7 +79,6 @@ COINGECKO_TOKEN_IDS = {
         "name": "Dai Stablecoin",
         "contract_address": "0x6b175474e89094c44da98b954eedeac495271d0f",
     },
-
     # DeFi Tokens
     "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9": {  # AAVE
         "id": "aave",
@@ -106,7 +104,6 @@ COINGECKO_TOKEN_IDS = {
         "name": "Wrapped Ether",
         "contract_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
     },
-
     # Other major tokens
     "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {  # WBTC
         "id": "wrapped-bitcoin",
@@ -123,7 +120,7 @@ COINGECKO_TOKEN_IDS = {
 }
 
 
-def get_coingecko_id(contract_address: Optional[str] = None, symbol: Optional[str] = None) -> Optional[str]:
+def get_coingecko_id(contract_address: str | None = None, symbol: str | None = None) -> str | None:
     """Get CoinGecko ID for a token.
 
     Args:
@@ -150,7 +147,7 @@ def get_coingecko_id(contract_address: Optional[str] = None, symbol: Optional[st
     return None
 
 
-def get_contract_address_from_coingecko_id(coingecko_id: str) -> Optional[str]:
+def get_contract_address_from_coingecko_id(coingecko_id: str) -> str | None:
     """Get contract address from CoinGecko ID.
 
     Args:
@@ -166,7 +163,7 @@ def get_contract_address_from_coingecko_id(coingecko_id: str) -> Optional[str]:
     return None
 
 
-def normalize_coingecko_price_data(data: Dict[str, Any]) -> TokenPrice:
+def normalize_coingecko_price_data(data: dict[str, Any]) -> TokenPrice:
     """Normalize CoinGecko API response to TokenPrice.
 
     Args:
@@ -219,7 +216,7 @@ def normalize_coingecko_price_data(data: Dict[str, Any]) -> TokenPrice:
     )
 
 
-def create_batch_ids_string(token_ids: List[str], max_length: int = 2000) -> List[str]:
+def create_batch_ids_string(token_ids: list[str], max_length: int = 2000) -> list[str]:
     """Create batched ID strings for CoinGecko API.
 
     CoinGecko API has URL length limits, so we need to batch large requests.
@@ -267,7 +264,5 @@ def is_stablecoin(symbol: str) -> bool:
     Returns:
         True if likely a stablecoin
     """
-    stablecoin_symbols = {
-        "usdc", "usdt", "dai", "busd", "tusd", "gusd", "usdd", "frax", "lusd"
-    }
+    stablecoin_symbols = {"usdc", "usdt", "dai", "busd", "tusd", "gusd", "usdd", "frax", "lusd"}
     return symbol.lower() in stablecoin_symbols

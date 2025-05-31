@@ -6,35 +6,37 @@ This package provides clients for interacting with various APIs:
 - Google Sheets for data input/output
 """
 
-from .ethereum_client import EthereumClient, EthereumClientError, InvalidAddressError, APIError as EthereumAPIError
-from .ethereum_types import (
-    TokenBalance,
-    EthBalance,
-    WalletPortfolio,
-    TokenMetadata,
-    TransactionInfo,
-    WalletActivity,
-    normalize_address,
-    is_valid_ethereum_address,
-    wei_to_eth,
-    format_token_amount,
-    calculate_token_value,
+from .coingecko_client import (
+    APIError as CoinGeckoAPIError,
 )
-
 from .coingecko_client import (
     CoinGeckoClient,
-    CoinGeckoPriceService,
     CoinGeckoClientError,
-    APIError as CoinGeckoAPIError,
+    CoinGeckoPriceService,
     RateLimitError,
 )
 from .coingecko_types import (
+    ContractPriceResponse,
     TokenPrice,
     TokenSearchResult,
-    ContractPriceResponse,
     get_coingecko_id,
-    normalize_coingecko_price_data,
     is_stablecoin,
+    normalize_coingecko_price_data,
+)
+from .ethereum_client import APIError as EthereumAPIError
+from .ethereum_client import EthereumClient, EthereumClientError, InvalidAddressError
+from .ethereum_types import (
+    EthBalance,
+    TokenBalance,
+    TokenMetadata,
+    TransactionInfo,
+    WalletActivity,
+    WalletPortfolio,
+    calculate_token_value,
+    format_token_amount,
+    is_valid_ethereum_address,
+    normalize_address,
+    wei_to_eth,
 )
 
 __all__ = [
@@ -43,14 +45,12 @@ __all__ = [
     "EthereumClientError",
     "InvalidAddressError",
     "EthereumAPIError",
-
     # CoinGecko client
     "CoinGeckoClient",
     "CoinGeckoPriceService",
     "CoinGeckoClientError",
     "CoinGeckoAPIError",
     "RateLimitError",
-
     # Ethereum data types
     "TokenBalance",
     "EthBalance",
@@ -58,12 +58,10 @@ __all__ = [
     "TokenMetadata",
     "TransactionInfo",
     "WalletActivity",
-
     # CoinGecko data types
     "TokenPrice",
     "TokenSearchResult",
     "ContractPriceResponse",
-
     # Utility functions
     "normalize_address",
     "is_valid_ethereum_address",
