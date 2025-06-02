@@ -150,9 +150,9 @@ class TestGoogleSheetsClient:
             )
 
             assert len(wallet_data) == 3
-            assert wallet_data[0]["address"] == "0x123abc"
-            assert wallet_data[0]["label"] == "Wallet 1"
-            assert wallet_data[2]["label"] == "Wallet 4"  # Auto-generated label
+            assert wallet_data[0].address == "0x123abc"
+            assert wallet_data[0].label == "Wallet 1"
+            assert wallet_data[2].label == "Wallet 3"  # Auto-generated label
 
     @pytest.mark.asyncio
     async def test_read_wallet_addresses_cached(self, sheets_client, mock_cache_manager) -> None:

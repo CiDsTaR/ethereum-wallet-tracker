@@ -12,8 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from wallet_tracker.clients import GoogleSheetsClient, WalletResult, create_summary_from_results
-from wallet_tracker.config import GoogleSheetsConfig, CacheConfig
-from wallet_tracker.utils import CacheManager
+from wallet_tracker.config import GoogleSheetsConfig
+from wallet_tracker.utils import CacheConfig, CacheManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -26,12 +26,9 @@ async def test_integration():
     logger.info("=" * 50)
 
     # Load test configuration
-    credentials_file = Path(os.getenv(
-        'GOOGLE_SHEETS_CREDENTIALS_FILE',
-        'config/test/google_sheets_credentials.json'
-    ))
+    credentials_file = Path(os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", "config/test/google_sheets_credentials.json"))
 
-    test_spreadsheet_id = os.getenv('TEST_SPREADSHEET_ID')
+    test_spreadsheet_id = os.getenv("TEST_SPREADSHEET_ID")
 
     # Validate prerequisites
     if not credentials_file.exists():
@@ -60,10 +57,7 @@ async def test_integration():
     cache_manager = CacheManager(cache_config)
 
     # Create client
-    config = GoogleSheetsConfig(
-        credentials_file=credentials_file,
-        scope="https://www.googleapis.com/auth/spreadsheets"
-    )
+    config = GoogleSheetsConfig(credentials_file=credentials_file, scope="https://www.googleapis.com/auth/spreadsheets")
 
     client = GoogleSheetsClient(config=config, cache_manager=cache_manager)
 
@@ -79,11 +73,11 @@ async def test_integration():
         # Test 2: Read wallet addresses
         logger.info("\n📖 Test 2: Read Wallet Addresses")
         try:
-            addresses = await client.read_wallet_addresses(
+            addresses = client.read_wallet_addresses(
                 spreadsheet_id=test_spreadsheet_id,
                 range_name="A:B",
                 worksheet_name=None,  # Use default sheet
-                skip_header=True
+                skip_header=True,
             )
 
             if not addresses:
@@ -91,10 +85,16 @@ async def test_integration():
                 logger.info("💡 Make sure your spreadsheet has data in columns A and B")
                 # Create sample data for testing
                 addresses = [
-                    {"address": "0x742d35Cc6634C0532925a3b8D40e3f337ABC7b86", "label": "Test Wallet 1",
-                     "row_number": 2},
-                    {"address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "label": "Test Wallet 2",
-                     "row_number": 3},
+                    {
+                        "address": "0x742d35Cc6634C0532925a3b8D40e3f337ABC7b86",
+                        "label": "Test Wallet 1",
+                        "row_number": 2,
+                    },
+                    {
+                        "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+                        "label": "Test Wallet 2",
+                        "row_number": 3,
+                    },
                 ]
                 logger.info("🔧 Using sample data for testing")
 
@@ -137,7 +137,7 @@ async def test_integration():
                 range_start="A1",
                 worksheet_name="Integration_Test_Results",
                 include_header=True,
-                clear_existing=True
+                clear_existing=True,
             )
 
             if not success:
@@ -182,7 +182,7 @@ async def test_integration():
             summary_success = client.create_summary_sheet(
                 spreadsheet_id=test_spreadsheet_id,
                 summary_data=summary.__dict__,
-                worksheet_name="Integration_Test_Summary"
+                worksheet_name="Integration_Test_Summary",
             )
 
             if not summary_success:
@@ -201,14 +201,14 @@ async def test_integration():
         logger.info("\n🔄 Test 5: Batch Operations")
         try:
             # Split results into batches
-            batch_1 = test_results[:len(test_results) // 2]
-            batch_2 = test_results[len(test_results) // 2:]
+            batch_1 = test_results[: len(test_results) // 2]
+            batch_2 = test_results[len(test_results) // 2 :]
 
             batch_success = client.write_batch_results(
                 spreadsheet_id=test_spreadsheet_id,
                 batch_results=[batch_1, batch_2],
                 worksheet_name="Integration_Test_Batch",
-                batch_size=max(1, len(test_results) // 2)
+                batch_size=max(1, len(test_results) // 2),
             )
 
             if not batch_success:
@@ -227,20 +227,17 @@ async def test_integration():
         try:
             # Test with invalid spreadsheet ID
             try:
-                await client.read_wallet_addresses(
-                    spreadsheet_id="invalid_spreadsheet_id_12345",
-                    range_name="A:B"
-                )
+                client.read_wallet_addresses(spreadsheet_id="invalid_spreadsheet_id_12345", range_name="A:B")
                 logger.warning("⚠️ Expected error handling test didn't fail as expected")
             except Exception:
                 logger.info("✅ Error handling working correctly for invalid spreadsheet")
 
             # Test with invalid range
             try:
-                await client.read_wallet_addresses(
+                client.read_wallet_addresses(
                     spreadsheet_id=test_spreadsheet_id,
                     range_name="ZZ:ZZZ",  # Invalid range
-                    worksheet_name="NonexistentSheet"
+                    worksheet_name="NonexistentSheet",
                 )
                 logger.warning("⚠️ Expected error handling test didn't fail as expected")
             except Exception:
@@ -276,6 +273,7 @@ async def test_integration():
     except Exception as e:
         logger.error(f"❌ Integration test failed with unexpected error: {e}")
         import traceback
+
         logger.error(traceback.format_exc())
         return False
 
@@ -324,11 +322,8 @@ if __name__ == "__main__":
     print("=" * 40)
 
     # Check if basic requirements are met
-    credentials_file = Path(os.getenv(
-        'GOOGLE_SHEETS_CREDENTIALS_FILE',
-        'config/test/google_sheets_credentials.json'
-    ))
-    test_spreadsheet_id = os.getenv('TEST_SPREADSHEET_ID')
+    credentials_file = Path(os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", "config/test/google_sheets_credentials.json"))
+    test_spreadsheet_id = os.getenv("TEST_SPREADSHEET_ID")
 
     if not credentials_file.exists() or not test_spreadsheet_id:
         print("⚠️ Setup required before running integration tests")
