@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Dict, List
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -156,7 +156,7 @@ class GoogleSheetsClient:
         range_name: str = "A:B",
         worksheet_name: str = None,
         skip_header: bool = True,
-    ) -> list[WalletAddress]:
+    ) -> List[WalletAddress]:
         """Read wallet addresses from Google Sheets.
 
         Args:
@@ -241,7 +241,7 @@ class GoogleSheetsClient:
             logger.error(f"❌ Error reading wallet addresses: {e}")
             raise SheetsAPIError(f"Failed to read wallet addresses: {e}") from e
 
-    def _read_sheet_values(self, spreadsheet_id: str, range_name: str, worksheet_name: str = None) -> list[list[str]]:
+    def _read_sheet_values(self, spreadsheet_id: str, range_name: str, worksheet_name: str = None) -> List[List[str]]:
         """Read values from sheet (blocking operation for thread pool)."""
         worksheet = self._get_worksheet(spreadsheet_id, worksheet_name)
         return worksheet.get(range_name)
@@ -249,15 +249,21 @@ class GoogleSheetsClient:
     async def write_wallet_results(
         self,
         spreadsheet_id: str,
-        wallet_results: list[WalletResult],
-        config: SheetConfig | None = None,
+        wallet_results: List[Dict[str, Any]],  # Changed from List[WalletResult] to allow dicts
+        range_start: str = "A1",
+        worksheet_name: str | None = None,
+        include_header: bool = True,
+        clear_existing: bool = True,
     ) -> bool:
         """Write wallet analysis results to Google Sheets.
 
         Args:
             spreadsheet_id: Google Sheets spreadsheet ID
-            wallet_results: List of WalletResult objects
-            config: Sheet configuration (optional)
+            wallet_results: List of wallet result dictionaries
+            range_start: Starting cell for writing results
+            worksheet_name: Worksheet name (optional)
+            include_header: Whether to include header row
+            clear_existing: Whether to clear existing data
 
         Returns:
             True if successful
@@ -269,15 +275,6 @@ class GoogleSheetsClient:
             logger.warning("⚠️ No wallet results to write")
             return True
 
-        # Use default config if not provided
-        if config is None:
-            config = SheetConfig(
-                spreadsheet_id=spreadsheet_id,
-                output_worksheet="Wallet_Results",
-                include_header=True,
-                clear_existing=True,
-            )
-
         try:
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
@@ -286,7 +283,10 @@ class GoogleSheetsClient:
                 self._write_results_sync,
                 spreadsheet_id,
                 wallet_results,
-                config,
+                range_start,
+                worksheet_name,
+                include_header,
+                clear_existing,
             )
 
             if success:
@@ -301,42 +301,48 @@ class GoogleSheetsClient:
             logger.error(f"❌ Error writing wallet results: {e}")
             raise SheetsAPIError(f"Failed to write wallet results: {e}") from e
 
-    def _write_results_sync(self, spreadsheet_id: str, wallet_results: list[WalletResult], config: SheetConfig) -> bool:
+    def _write_results_sync(
+        self,
+        spreadsheet_id: str,
+        wallet_results: List[Dict[str, Any]],
+        range_start: str,
+        worksheet_name: str | None,
+        include_header: bool,
+        clear_existing: bool
+    ) -> bool:
         """Write results synchronously (for thread pool execution)."""
-        worksheet = self._get_worksheet(spreadsheet_id, config.output_worksheet)
+        worksheet = self._get_worksheet(spreadsheet_id, worksheet_name)
 
         # Prepare data for writing
         data_to_write = []
 
         # Add header row if requested
-        if config.include_header:
+        if include_header:
             data_to_write.append(WALLET_RESULT_HEADERS)
 
         # Add wallet data rows
         for result in wallet_results:
             row = [
-                result.address,
-                result.label,
-                self._format_balance(result.eth_balance),
-                self._format_usd_value(result.eth_value_usd),
-                self._format_balance(result.usdc_balance),
-                self._format_balance(result.usdt_balance),
-                self._format_balance(result.dai_balance),
-                self._format_balance(result.aave_balance),
-                self._format_balance(result.uni_balance),
-                self._format_balance(result.link_balance),
-                self._format_usd_value(result.other_tokens_value_usd),
-                self._format_usd_value(result.total_value_usd),
-                result.last_updated.strftime("%Y-%m-%d %H:%M:%S")
-                if isinstance(result.last_updated, datetime)
-                else str(result.last_updated),
-                result.transaction_count,
-                "✅ Active" if result.is_active else "❌ Inactive",
+                result.get("address", ""),
+                result.get("label", ""),
+                self._format_balance(result.get("eth_balance", 0)),
+                self._format_usd_value(result.get("eth_value_usd", 0)),
+                self._format_balance(result.get("usdc_balance", 0)),
+                self._format_balance(result.get("usdt_balance", 0)),
+                self._format_balance(result.get("dai_balance", 0)),
+                self._format_balance(result.get("aave_balance", 0)),
+                self._format_balance(result.get("uni_balance", 0)),
+                self._format_balance(result.get("link_balance", 0)),
+                self._format_usd_value(result.get("other_tokens_value_usd", 0)),
+                self._format_usd_value(result.get("total_value_usd", 0)),
+                result.get("last_updated", ""),
+                result.get("transaction_count", 0),
+                "✅ Active" if result.get("is_active", False) else "❌ Inactive",
             ]
             data_to_write.append(row)
 
         # Clear existing data if requested
-        if config.clear_existing:
+        if clear_existing:
             worksheet.clear()
 
         # Write data to sheet
@@ -353,86 +359,17 @@ class GoogleSheetsClient:
 
         return True
 
-    async def write_batch_results(
-        self,
-        spreadsheet_id: str,
-        wallet_results: list[WalletResult],
-        batch_size: int = 100,
-        worksheet_name: str = "Batch_Results",
-    ) -> bool:
-        """Write wallet results in batches for better performance.
-
-        Args:
-            spreadsheet_id: Google Sheets spreadsheet ID
-            wallet_results: List of WalletResult objects
-            batch_size: Number of rows to write per batch
-            worksheet_name: Worksheet name for results
-
-        Returns:
-            True if successful
-        """
-        if not wallet_results:
-            logger.warning("⚠️ No wallet results to write in batches")
-            return True
-
-        try:
-            total_batches = (len(wallet_results) + batch_size - 1) // batch_size
-            logger.info(f"📊 Writing {len(wallet_results)} results in {total_batches} batches")
-
-            # Process in batches
-            for batch_num in range(total_batches):
-                start_idx = batch_num * batch_size
-                end_idx = min(start_idx + batch_size, len(wallet_results))
-                batch = wallet_results[start_idx:end_idx]
-
-                # Configure batch writing
-                config = SheetConfig(
-                    spreadsheet_id=spreadsheet_id,
-                    output_worksheet=worksheet_name,
-                    include_header=(batch_num == 0),  # Only include header in first batch
-                    clear_existing=(batch_num == 0),  # Only clear for first batch
-                )
-
-                # For subsequent batches, adjust the starting row
-                if batch_num > 0:
-                    config.output_range = f"A{start_idx + 2}"  # +2 to account for header
-
-                success = await self.write_wallet_results(
-                    spreadsheet_id=spreadsheet_id,
-                    wallet_results=batch,
-                    config=config,
-                )
-
-                if not success:
-                    logger.error(f"❌ Failed to write batch {batch_num + 1}/{total_batches}")
-                    return False
-
-                logger.info(f"✅ Completed batch {batch_num + 1}/{total_batches} ({len(batch)} rows)")
-
-                # Small delay between batches to respect API limits
-                if batch_num < total_batches - 1:
-                    await asyncio.sleep(0.5)
-
-            logger.info(f"🎉 Successfully wrote all {len(wallet_results)} results in {total_batches} batches")
-            self._stats["batch_operations"] += 1
-            return True
-
-        except Exception as e:
-            self._stats["api_errors"] += 1
-            logger.error(f"❌ Error writing batch results: {e}")
-            raise SheetsAPIError(f"Failed to write batch results: {e}") from e
-
     async def create_summary_sheet(
         self,
         spreadsheet_id: str,
-        summary_data: SummaryData,
+        summary_data: Dict[str, Any],  # Changed from SummaryData to allow dicts
         worksheet_name: str = "Summary",
     ) -> bool:
         """Create a summary sheet with overall statistics.
 
         Args:
             spreadsheet_id: Google Sheets spreadsheet ID
-            summary_data: Summary statistics
+            summary_data: Summary statistics dictionary
             worksheet_name: Name for the summary worksheet
 
         Returns:
@@ -459,7 +396,7 @@ class GoogleSheetsClient:
             logger.error(f"❌ Error creating summary sheet: {e}")
             raise SheetsAPIError(f"Failed to create summary sheet: {e}") from e
 
-    def _create_summary_sync(self, spreadsheet_id: str, summary_data: SummaryData, worksheet_name: str) -> bool:
+    def _create_summary_sync(self, spreadsheet_id: str, summary_data: Dict[str, Any], worksheet_name: str) -> bool:
         """Create summary sheet synchronously."""
         worksheet = self._get_worksheet(spreadsheet_id, worksheet_name)
         worksheet.clear()  # Clear existing content
@@ -470,26 +407,26 @@ class GoogleSheetsClient:
             [""],
             ["📈 Overview Statistics"],
             ["Metric", "Value"],
-            ["Total Wallets Analyzed", summary_data.total_wallets],
-            ["✅ Active Wallets", summary_data.active_wallets],
-            ["❌ Inactive Wallets", summary_data.inactive_wallets],
+            ["Total Wallets Analyzed", summary_data.get("total_wallets", 0)],
+            ["✅ Active Wallets", summary_data.get("active_wallets", 0)],
+            ["❌ Inactive Wallets", summary_data.get("inactive_wallets", 0)],
             [""],
             ["💰 Portfolio Values"],
             ["Metric", "Amount (USD)"],
-            ["Total Portfolio Value", self._format_usd_value(summary_data.total_value_usd)],
-            ["Average Portfolio Value", self._format_usd_value(summary_data.average_value_usd)],
-            ["Median Portfolio Value", self._format_usd_value(summary_data.median_value_usd)],
+            ["Total Portfolio Value", self._format_usd_value(summary_data.get("total_value_usd", 0))],
+            ["Average Portfolio Value", self._format_usd_value(summary_data.get("average_value_usd", 0))],
+            ["Median Portfolio Value", self._format_usd_value(summary_data.get("median_value_usd", 0))],
             [""],
             ["🪙 Top Holdings by Value"],
             ["Token", "Total Value (USD)", "# Holders"],
-            ["ETH", self._format_usd_value(summary_data.eth_total_value), summary_data.eth_holders],
-            ["USDC", self._format_usd_value(summary_data.usdc_total_value), summary_data.usdc_holders],
-            ["USDT", self._format_usd_value(summary_data.usdt_total_value), summary_data.usdt_holders],
-            ["DAI", self._format_usd_value(summary_data.dai_total_value), summary_data.dai_holders],
+            ["ETH", self._format_usd_value(summary_data.get("eth_total_value", 0)), summary_data.get("eth_holders", 0)],
+            ["USDC", self._format_usd_value(summary_data.get("usdc_total_value", 0)), summary_data.get("usdc_holders", 0)],
+            ["USDT", self._format_usd_value(summary_data.get("usdt_total_value", 0)), summary_data.get("usdt_holders", 0)],
+            ["DAI", self._format_usd_value(summary_data.get("dai_total_value", 0)), summary_data.get("dai_holders", 0)],
             [""],
             ["⏱️ Analysis Information"],
-            ["Analysis Completed", summary_data.analysis_time.strftime("%Y-%m-%d %H:%M:%S")],
-            ["Processing Time", summary_data.processing_time],
+            ["Analysis Completed", summary_data.get("analysis_time", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))],
+            ["Processing Time", summary_data.get("processing_time", "Unknown")],
         ]
 
         # Write summary data
@@ -500,43 +437,45 @@ class GoogleSheetsClient:
 
         return True
 
-    def _format_balance(self, balance: Decimal | float | str) -> str:
+    def _format_balance(self, balance) -> str:
         """Format token balance for display."""
-        if isinstance(balance, str):
-            try:
+        try:
+            if isinstance(balance, str):
                 balance = Decimal(balance)
-            except:
-                return str(balance)
+            elif isinstance(balance, (int, float)):
+                balance = Decimal(str(balance))
+            elif not isinstance(balance, Decimal):
+                return "0"
 
-        if isinstance(balance, (int, float)):
-            balance = Decimal(str(balance))
+            if balance == 0:
+                return "0"
+            elif balance < Decimal("0.001"):
+                return f"{balance:.6f}"
+            elif balance < Decimal("1"):
+                return f"{balance:.4f}"
+            else:
+                return f"{balance:,.4f}"
+        except:
+            return str(balance)
 
-        if balance == 0:
-            return "0"
-        elif balance < Decimal("0.001"):
-            return f"{balance:.6f}"
-        elif balance < Decimal("1"):
-            return f"{balance:.4f}"
-        else:
-            return f"{balance:,.4f}"
-
-    def _format_usd_value(self, value: Decimal | float | str) -> str:
+    def _format_usd_value(self, value) -> str:
         """Format USD value for display."""
-        if isinstance(value, str):
-            try:
+        try:
+            if isinstance(value, str):
                 value = Decimal(value)
-            except:
-                return str(value)
+            elif isinstance(value, (int, float)):
+                value = Decimal(str(value))
+            elif not isinstance(value, Decimal):
+                return "$0.00"
 
-        if isinstance(value, (int, float)):
-            value = Decimal(str(value))
-
-        if value == 0:
-            return "$0.00"
-        elif value < Decimal("0.01"):
-            return f"${value:.4f}"
-        else:
-            return f"${value:,.2f}"
+            if value == 0:
+                return "$0.00"
+            elif value < Decimal("0.01"):
+                return f"${value:.4f}"
+            else:
+                return f"${value:,.2f}"
+        except:
+            return str(value)
 
     def _format_results_sheet(self, worksheet: gspread.Worksheet, num_rows: int) -> None:
         """Apply formatting to results sheet."""
@@ -606,7 +545,7 @@ class GoogleSheetsClient:
         except Exception as e:
             logger.warning(f"⚠️ Failed to format summary sheet: {e}")
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """Get client statistics."""
         return {
             "read_operations": self._stats["read_operations"],

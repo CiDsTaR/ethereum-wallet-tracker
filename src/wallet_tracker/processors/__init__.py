@@ -52,6 +52,7 @@ __all__ = [
     "ProcessingPriority",
     "SkipReason",
     "WalletValidationResult",
+    "ProcessingResults",
     # Batch processing types
     "BatchType",
     "BatchState",
@@ -67,10 +68,6 @@ __all__ = [
     "QueuePriority",
     "ResourceType",
     "ResourceLimits",
-    # Processing results
-    "ProcessingResults",
-    # Throttle and backoff types
-    # Note: These are in utils/throttle.py and utils/rate_limiter.py
     # Utility functions
     "create_jobs_from_addresses",
     "group_jobs_by_priority",

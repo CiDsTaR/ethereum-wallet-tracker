@@ -63,6 +63,179 @@ class QueuePriority(int, Enum):
 
 
 @dataclass
+class BatchConfig:
+    """Configuration for batch processing operations."""
+
+    # Basic batch settings
+    batch_size: int = 50
+    max_concurrent_jobs_per_batch: int = 10
+    batch_delay_seconds: float = 1.0
+    request_delay_seconds: float = 0.1
+    timeout_seconds: int = 60
+
+    # Processing options
+    skip_inactive_wallets: bool = True
+    inactive_threshold_days: int = 365
+    min_value_threshold_usd: Decimal = field(default_factory=lambda: Decimal("1.0"))
+
+    # Retry configuration
+    retry_failed_jobs: bool = True
+    max_retries: int = 3
+    retry_delay_seconds: float = 2.0
+
+    # Cache settings
+    use_cache: bool = True
+    cache_ttl_seconds: int = 3600
+
+    # Rate limiting
+    max_requests_per_minute: int = 100
+    enable_adaptive_throttling: bool = True
+
+    # Output settings
+    include_inactive_in_results: bool = False
+    detailed_error_reporting: bool = True
+
+    def validate(self) -> List[str]:
+        """Validate batch configuration and return any errors."""
+        errors = []
+
+        if self.batch_size < 1:
+            errors.append("batch_size must be at least 1")
+
+        if self.max_concurrent_jobs_per_batch < 1:
+            errors.append("max_concurrent_jobs_per_batch must be at least 1")
+
+        if self.timeout_seconds < 1:
+            errors.append("timeout_seconds must be at least 1")
+
+        if self.inactive_threshold_days < 1:
+            errors.append("inactive_threshold_days must be at least 1")
+
+        if self.max_retries < 0:
+            errors.append("max_retries cannot be negative")
+
+        if self.min_value_threshold_usd < 0:
+            errors.append("min_value_threshold_usd cannot be negative")
+
+        return errors
+
+
+@dataclass
+class BatchProgress:
+    """Progress tracking for batch operations."""
+
+    batch_id: str
+    total_jobs: int
+    started_at: datetime
+    total_batches: int = 1
+    current_batch_number: int = 1
+
+    # Progress counters
+    jobs_completed: int = 0
+    jobs_failed: int = 0
+    jobs_skipped: int = 0
+    jobs_cached: int = 0
+
+    # Performance metrics
+    total_value_processed: Decimal = field(default_factory=lambda: Decimal("0"))
+    api_calls_made: int = 0
+    cache_hits: int = 0
+
+    # Status
+    current_status: str = "running"
+    current_operation: str = "initializing"
+    estimated_completion: Optional[datetime] = None
+
+    def update_progress(self, job: 'WalletProcessingJob') -> None:
+        """Update progress with completed job."""
+        from .wallet_types import WalletStatus
+
+        if job.status == WalletStatus.COMPLETED:
+            self.jobs_completed += 1
+            if job.total_value_usd:
+                self.total_value_processed += job.total_value_usd
+        elif job.status == WalletStatus.FAILED:
+            self.jobs_failed += 1
+        elif job.status == WalletStatus.SKIPPED:
+            self.jobs_skipped += 1
+        elif job.status == WalletStatus.CACHED:
+            self.jobs_cached += 1
+
+        self.api_calls_made += job.api_calls_made
+
+        if job.cache_hit:
+            self.cache_hits += 1
+
+        # Update estimated completion
+        self._update_estimated_completion()
+
+    def _update_estimated_completion(self) -> None:
+        """Update estimated completion time based on current progress."""
+        jobs_processed = self.jobs_completed + self.jobs_failed + self.jobs_skipped + self.jobs_cached
+
+        if jobs_processed > 0:
+            elapsed = datetime.utcnow() - self.started_at
+            avg_time_per_job = elapsed.total_seconds() / jobs_processed
+            remaining_jobs = self.total_jobs - jobs_processed
+            remaining_seconds = remaining_jobs * avg_time_per_job
+
+            self.estimated_completion = datetime.utcnow() + timedelta(seconds=remaining_seconds)
+
+    def get_progress_percentage(self) -> float:
+        """Get completion percentage."""
+        if self.total_jobs == 0:
+            return 100.0
+
+        jobs_processed = self.jobs_completed + self.jobs_failed + self.jobs_skipped + self.jobs_cached
+        return (jobs_processed / self.total_jobs) * 100
+
+    def get_success_rate(self) -> float:
+        """Get success rate percentage."""
+        jobs_processed = self.jobs_completed + self.jobs_failed + self.jobs_skipped + self.jobs_cached
+
+        if jobs_processed == 0:
+            return 0.0
+
+        return (self.jobs_completed / jobs_processed) * 100
+
+    def get_cache_hit_rate(self) -> float:
+        """Get cache hit rate percentage."""
+        total_requests = self.api_calls_made + self.cache_hits
+
+        if total_requests == 0:
+            return 0.0
+
+        return (self.cache_hits / total_requests) * 100
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get progress summary for reporting."""
+        jobs_processed = self.jobs_completed + self.jobs_failed + self.jobs_skipped + self.jobs_cached
+        elapsed = datetime.utcnow() - self.started_at
+
+        return {
+            "batch_id": self.batch_id,
+            "progress_percent": self.get_progress_percentage(),
+            "jobs_processed": jobs_processed,
+            "total_jobs": self.total_jobs,
+            "current_batch": f"{self.current_batch_number}/{self.total_batches}",
+            "status": self.current_status,
+            "operation": self.current_operation,
+            "elapsed_seconds": elapsed.total_seconds(),
+            "estimated_completion": self.estimated_completion.isoformat() if self.estimated_completion else None,
+            "success_rate": self.get_success_rate(),
+            "cache_hit_rate": self.get_cache_hit_rate(),
+            "total_value_usd": float(self.total_value_processed),
+            "performance": {
+                "completed": self.jobs_completed,
+                "failed": self.jobs_failed,
+                "skipped": self.jobs_skipped,
+                "cached": self.jobs_cached,
+                "api_calls": self.api_calls_made,
+            }
+        }
+
+
+@dataclass
 class ResourceLimits:
     """Resource limits for batch operations."""
 
