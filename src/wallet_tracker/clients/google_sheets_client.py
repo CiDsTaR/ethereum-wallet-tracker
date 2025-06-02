@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -12,12 +12,12 @@ from google.oauth2.service_account import Credentials
 from ..config import GoogleSheetsConfig
 from ..utils import CacheManager
 from .google_sheets_types import (
+    WALLET_RESULT_HEADERS,
     SheetConfig,
     SheetRange,
+    SummaryData,
     WalletAddress,
     WalletResult,
-    SummaryData,
-    WALLET_RESULT_HEADERS,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,8 +88,7 @@ class GoogleSheetsClient:
             try:
                 # Load service account credentials
                 credentials = Credentials.from_service_account_file(
-                    self.config.credentials_file,
-                    scopes=[self.config.scope]
+                    self.config.credentials_file, scopes=[self.config.scope]
                 )
 
                 # Create and authenticate client
@@ -97,9 +96,7 @@ class GoogleSheetsClient:
                 logger.info("✅ Google Sheets client authenticated successfully")
 
             except FileNotFoundError as e:
-                raise SheetsAuthenticationError(
-                    f"❌ Credentials file not found: {self.config.credentials_file}"
-                ) from e
+                raise SheetsAuthenticationError(f"❌ Credentials file not found: {self.config.credentials_file}") from e
             except Exception as e:
                 self._stats["api_errors"] += 1
                 logger.error(f"❌ Failed to authenticate with Google Sheets: {e}")
@@ -131,11 +128,7 @@ class GoogleSheetsClient:
                 except gspread.WorksheetNotFound:
                     # Create worksheet if it doesn't exist
                     logger.info(f"📄 Creating new worksheet: {worksheet_name}")
-                    worksheet = spreadsheet.add_worksheet(
-                        title=worksheet_name,
-                        rows=1000,
-                        cols=20
-                    )
+                    worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=1000, cols=20)
             else:
                 worksheet = spreadsheet.sheet1
 
@@ -193,11 +186,7 @@ class GoogleSheetsClient:
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             values = await loop.run_in_executor(
-                None,
-                self._read_sheet_values,
-                spreadsheet_id,
-                range_name,
-                worksheet_name
+                None, self._read_sheet_values, spreadsheet_id, range_name, worksheet_name
             )
 
             if not values:
@@ -220,11 +209,13 @@ class GoogleSheetsClient:
                 label = row[1].strip() if len(row) > 1 and row[1] else f"Wallet {i + 1}"
                 row_number = i + data_start_row
 
-                wallet_addresses.append(WalletAddress(
-                    address=address,
-                    label=label,
-                    row_number=row_number,
-                ))
+                wallet_addresses.append(
+                    WalletAddress(
+                        address=address,
+                        label=label,
+                        row_number=row_number,
+                    )
+                )
 
             logger.info(f"📖 Read {len(wallet_addresses)} wallet addresses from spreadsheet")
             self._stats["read_operations"] += 1
@@ -233,11 +224,12 @@ class GoogleSheetsClient:
             # Cache the data (serialize for caching)
             if self.cache_manager:
                 cache_data = [
-                    {"address": wa.address, "label": wa.label, "row_number": wa.row_number}
-                    for wa in wallet_addresses
+                    {"address": wa.address, "label": wa.label, "row_number": wa.row_number} for wa in wallet_addresses
                 ]
                 await self.cache_manager.get_general_cache().set(
-                    cache_key, cache_data, ttl=300  # 5 minutes
+                    cache_key,
+                    cache_data,
+                    ttl=300,  # 5 minutes
                 )
 
             return wallet_addresses
@@ -309,12 +301,7 @@ class GoogleSheetsClient:
             logger.error(f"❌ Error writing wallet results: {e}")
             raise SheetsAPIError(f"Failed to write wallet results: {e}") from e
 
-    def _write_results_sync(
-        self,
-        spreadsheet_id: str,
-        wallet_results: list[WalletResult],
-        config: SheetConfig
-    ) -> bool:
+    def _write_results_sync(self, spreadsheet_id: str, wallet_results: list[WalletResult], config: SheetConfig) -> bool:
         """Write results synchronously (for thread pool execution)."""
         worksheet = self._get_worksheet(spreadsheet_id, config.output_worksheet)
 
@@ -340,7 +327,9 @@ class GoogleSheetsClient:
                 self._format_balance(result.link_balance),
                 self._format_usd_value(result.other_tokens_value_usd),
                 self._format_usd_value(result.total_value_usd),
-                result.last_updated.strftime("%Y-%m-%d %H:%M:%S") if isinstance(result.last_updated, datetime) else str(result.last_updated),
+                result.last_updated.strftime("%Y-%m-%d %H:%M:%S")
+                if isinstance(result.last_updated, datetime)
+                else str(result.last_updated),
                 result.transaction_count,
                 "✅ Active" if result.is_active else "❌ Inactive",
             ]
@@ -470,12 +459,7 @@ class GoogleSheetsClient:
             logger.error(f"❌ Error creating summary sheet: {e}")
             raise SheetsAPIError(f"Failed to create summary sheet: {e}") from e
 
-    def _create_summary_sync(
-        self,
-        spreadsheet_id: str,
-        summary_data: SummaryData,
-        worksheet_name: str
-    ) -> bool:
+    def _create_summary_sync(self, spreadsheet_id: str, summary_data: SummaryData, worksheet_name: str) -> bool:
         """Create summary sheet synchronously."""
         worksheet = self._get_worksheet(spreadsheet_id, worksheet_name)
         worksheet.clear()  # Clear existing content
@@ -560,12 +544,15 @@ class GoogleSheetsClient:
             # Format header row
             if num_rows > 0:
                 header_range = f"A1:{SheetRange.column_to_letter(len(WALLET_RESULT_HEADERS))}1"
-                worksheet.format(header_range, {
-                    "textFormat": {"bold": True, "fontSize": 11},
-                    "backgroundColor": {"red": 0.2, "green": 0.6, "blue": 0.9},
-                    "textFormat": {"foregroundColor": {"red": 1, "green": 1, "blue": 1}},
-                    "horizontalAlignment": "CENTER"
-                })
+                worksheet.format(
+                    header_range,
+                    {
+                        "textFormat": {"bold": True, "fontSize": 11},
+                        "backgroundColor": {"red": 0.2, "green": 0.6, "blue": 0.9},
+                        "textFormat": {"foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                        "horizontalAlignment": "CENTER",
+                    },
+                )
 
             # Freeze header row
             worksheet.freeze(rows=1)
@@ -575,17 +562,13 @@ class GoogleSheetsClient:
                 currency_cols = ["D", "K", "L"]  # ETH Value, Other Tokens, Total Value
                 for col in currency_cols:
                     range_name = f"{col}2:{col}{num_rows}"
-                    worksheet.format(range_name, {
-                        "numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"}
-                    })
+                    worksheet.format(range_name, {"numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"}})
 
                 # Format balance columns with more decimals
                 balance_cols = ["C", "E", "F", "G", "H", "I", "J"]  # Token balances
                 for col in balance_cols:
                     range_name = f"{col}2:{col}{num_rows}"
-                    worksheet.format(range_name, {
-                        "numberFormat": {"type": "NUMBER", "pattern": "#,##0.0000"}
-                    })
+                    worksheet.format(range_name, {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.0000"}})
 
         except Exception as e:
             logger.warning(f"⚠️ Failed to format results sheet: {e}")
@@ -594,34 +577,31 @@ class GoogleSheetsClient:
         """Apply formatting to summary sheet."""
         try:
             # Format title
-            worksheet.format("A1", {
-                "textFormat": {"bold": True, "fontSize": 16},
-                "horizontalAlignment": "CENTER"
-            })
+            worksheet.format("A1", {"textFormat": {"bold": True, "fontSize": 16}, "horizontalAlignment": "CENTER"})
 
             # Format section headers
             headers = ["A3", "A9", "A15", "A22"]
             for header in headers:
-                worksheet.format(header, {
-                    "textFormat": {"bold": True, "fontSize": 12},
-                    "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}
-                })
+                worksheet.format(
+                    header,
+                    {
+                        "textFormat": {"bold": True, "fontSize": 12},
+                        "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9},
+                    },
+                )
 
             # Format metric headers
-            worksheet.format("A4:B4", {
-                "textFormat": {"bold": True},
-                "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}
-            })
+            worksheet.format(
+                "A4:B4", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}}
+            )
 
-            worksheet.format("A10:B10", {
-                "textFormat": {"bold": True},
-                "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}
-            })
+            worksheet.format(
+                "A10:B10", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}}
+            )
 
-            worksheet.format("A16:C16", {
-                "textFormat": {"bold": True},
-                "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}
-            })
+            worksheet.format(
+                "A16:C16", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}}
+            )
 
         except Exception as e:
             logger.warning(f"⚠️ Failed to format summary sheet: {e}")
