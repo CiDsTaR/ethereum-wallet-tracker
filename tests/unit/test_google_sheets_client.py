@@ -9,15 +9,12 @@ import pytest
 
 from wallet_tracker.clients import (
     GoogleSheetsClient,
-    GoogleSheetsClientError,
     SheetRange,
     SheetsAPIError,
     SheetsAuthenticationError,
-    SheetsNotFoundError,
     SheetsPermissionError,
     WalletResult,
     create_summary_from_results,
-    create_wallet_result_from_portfolio,
 )
 from wallet_tracker.config import GoogleSheetsConfig
 from wallet_tracker.utils import CacheManager
@@ -146,7 +143,7 @@ class TestGoogleSheetsClient:
             mock_worksheet.get.return_value = mock_worksheet_data
             mock_get_worksheet.return_value = mock_worksheet
 
-            wallet_data = sheets_client.read_wallet_addresses(
+            wallet_data = await sheets_client.read_wallet_addresses(
                 spreadsheet_id="test_sheet_id",
                 range_name="A:B",
                 skip_header=True,
@@ -160,13 +157,11 @@ class TestGoogleSheetsClient:
     @pytest.mark.asyncio
     async def test_read_wallet_addresses_cached(self, sheets_client, mock_cache_manager) -> None:
         """Test wallet address reading with cache hit."""
-        cached_data = [
-            {"address": "0x123abc", "label": "Cached Wallet", "row_number": 2}
-        ]
+        cached_data = [{"address": "0x123abc", "label": "Cached Wallet", "row_number": 2}]
 
         mock_cache_manager.get_general_cache().get.return_value = cached_data
 
-        wallet_data = sheets_client.read_wallet_addresses(
+        wallet_data = await sheets_client.read_wallet_addresses(
             spreadsheet_id="test_sheet_id",
             range_name="A:B",
         )
